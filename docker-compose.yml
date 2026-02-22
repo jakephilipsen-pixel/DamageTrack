@@ -1,0 +1,86 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: damagetrack_db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-damagetrack}
+      POSTGRES_USER: ${POSTGRES_USER:-damagetrack}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD required}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-damagetrack} -d ${POSTGRES_DB:-damagetrack}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - damagetrack-net
+
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: damagetrack_server
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-damagetrack}:${DB_PASSWORD}@db:5432/${POSTGRES_DB:-damagetrack}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET required}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET required}
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-noreply@damagetrack.local}
+      APP_PORT: 3001
+      APP_URL: ${APP_URL:-http://localhost:8084}
+      NODE_ENV: production
+      UPLOAD_DIR: /app/uploads
+      MAX_FILE_SIZE: ${MAX_FILE_SIZE:-10485760}
+    volumes:
+      - uploads:/app/uploads
+      - server_logs:/app/logs
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - damagetrack-net
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: damagetrack_client
+    depends_on:
+      - server
+    restart: unless-stopped
+    networks:
+      - damagetrack-net
+
+  nginx:
+    image: nginx:alpine
+    container_name: damagetrack_nginx
+    ports:
+      - "8084:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - client
+      - server
+    restart: unless-stopped
+    networks:
+      - damagetrack-net
+
+volumes:
+  pgdata:
+    driver: local
+  uploads:
+    driver: local
+  server_logs:
+    driver: local
+
+networks:
+  damagetrack-net:
+    driver: bridge

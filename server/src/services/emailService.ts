@@ -1,0 +1,187 @@
+import path from 'path';
+import fs from 'fs';
+import { createTransporter } from '../config/email';
+import prisma from '../config/database';
+import logger from '../utils/logger';
+import { format } from 'date-fns';
+
+const UPLOAD_DIR = process.env.UPLOAD_DIR || './uploads';
+
+type FullDamageReport = Awaited<ReturnType<typeof import('./damageService').getDamageById>>;
+
+function getSeverityColor(severity: string): string {
+  switch (severity) {
+    case 'MINOR': return '#22c55e';
+    case 'MODERATE': return '#f59e0b';
+    case 'MAJOR': return '#ef4444';
+    case 'TOTAL_LOSS': return '#7f1d1d';
+    default: return '#6b7280';
+  }
+}
+
+function getStatusColor(status: string): string {
+  switch (status) {
+    case 'DRAFT': return '#6b7280';
+    case 'REPORTED': return '#3b82f6';
+    case 'UNDER_REVIEW': return '#f59e0b';
+    case 'CUSTOMER_NOTIFIED': return '#8b5cf6';
+    case 'CLAIM_FILED': return '#ef4444';
+    case 'RESOLVED': return '#22c55e';
+    case 'WRITTEN_OFF': return '#374151';
+    case 'CLOSED': return '#059669';
+    default: return '#6b7280';
+  }
+}
+
+function formatLabel(str: string): string {
+  return str
+    .replace(/_/g, ' ')
+    .toLowerCase()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function buildEmailHtml(
+  report: FullDamageReport,
+  bodyText: string
+): string {
+  const companyName = process.env.COMPANY_NAME || 'DamageTrack';
+  const reporterName = report.reportedBy
+    ? `${report.reportedBy.firstName} ${report.reportedBy.lastName}`
+    : 'Unknown';
+  const reviewerName = report.reviewedBy
+    ? `${report.reviewedBy.firstName} ${report.reviewedBy.lastName}`
+    : 'Not assigned';
+
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Damage Report ${report.referenceNumber}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; background: #f3f4f6; }
+    .wrapper { max-width: 680px; margin: 0 auto; background: #ffffff; }
+    .header { background: #1e3a5f; color: #ffffff; padding: 24px 32px; }
+    .header h1 { margin: 0; font-size: 22px; font-weight: 700; }
+    .header p { margin: 4px 0 0; font-size: 13px; opacity: 0.8; }
+    .badge { display: inline-block; padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: 700; color: #fff; }
+    .content { padding: 32px; }
+    .intro-text { background: #f8fafc; border-left: 4px solid #1e3a5f; padding: 16px; margin-bottom: 24px; border-radius: 4px; font-size: 14px; line-height: 1.6; color: #374151; }
+    .section-title { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #6b7280; margin: 24px 0 12px; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; }
+    table.details { width: 100%; border-collapse: collapse; }
+    table.details tr td { padding: 8px 0; font-size: 14px; vertical-align: top; }
+    table.details tr td:first-child { color: #6b7280; width: 180px; font-weight: 500; }
+    table.details tr td:last-child { color: #111827; font-weight: 400; }
+    .description-box { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; padding: 16px; font-size: 14px; line-height: 1.7; color: #374151; }
+    .footer { background: #f3f4f6; padding: 24px 32px; font-size: 12px; color: #9ca3af; text-align: center; }
+    .footer a { color: #1e3a5f; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="header">
+      <h1>${companyName} — Damage Report</h1>
+      <p>Reference: <strong>${report.referenceNumber}</strong></p>
+    </div>
+    <div class="content">
+      ${bodyText ? `<div class="intro-text">${bodyText.replace(/\n/g, '<br />')}</div>` : ''}
+
+      <div class="section-title">Report Status</div>
+      <table class="details">
+        <tr>
+          <td>Status</td>
+          <td><span class="badge" style="background:${getStatusColor(report.status)}">${formatLabel(report.status)}</span></td>
+        </tr>
+        <tr>
+          <td>Severity</td>
+          <td><span class="badge" style="background:${getSeverityColor(report.severity)}">${formatLabel(report.severity)}</span></td>
+        </tr>
+      </table>
+
+      <div class="section-title">Damage Details</div>
+      <table class="details">
+        <tr><td>Reference #</td><td>${report.referenceNumber}</td></tr>
+        <tr><td>Customer</td><td>${report.customer.name} (${report.customer.code})</td></tr>
+        <tr><td>Product</td><td>${report.product.name} — SKU: ${report.product.sku}</td></tr>
+        <tr><td>Quantity Damaged</td><td>${report.quantity} unit(s)</td></tr>
+        <tr><td>Cause</td><td>${formatLabel(report.cause)}${report.causeOther ? ` — ${report.causeOther}` : ''}</td></tr>
+        <tr><td>Location</td><td>${report.locationInWarehouse || 'Not specified'}</td></tr>
+        <tr><td>Date of Damage</td><td>${format(new Date(report.dateOfDamage), 'dd MMM yyyy')}</td></tr>
+        <tr><td>Date Reported</td><td>${format(new Date(report.dateReported), 'dd MMM yyyy HH:mm')}</td></tr>
+        <tr><td>Reported By</td><td>${reporterName}</td></tr>
+        <tr><td>Reviewed By</td><td>${reviewerName}</td></tr>
+        <tr><td>Estimated Loss</td><td>${report.estimatedLoss !== null && report.estimatedLoss !== undefined ? `$${Number(report.estimatedLoss).toFixed(2)}` : 'Not estimated'}</td></tr>
+        ${report.dateResolved ? `<tr><td>Date Resolved</td><td>${format(new Date(report.dateResolved), 'dd MMM yyyy')}</td></tr>` : ''}
+      </table>
+
+      <div class="section-title">Description</div>
+      <div class="description-box">${report.description}</div>
+
+      ${(report as FullDamageReport & { _count?: { photos: number } })._count?.photos
+        ? `<p style="margin-top:24px;font-size:13px;color:#6b7280;">${(report as FullDamageReport & { _count?: { photos: number } })._count?.photos} photo(s) attached to this report.</p>`
+        : ''}
+    </div>
+    <div class="footer">
+      <p>This email was sent by <strong>${companyName}</strong> Warehouse Damage Management System.</p>
+      <p>Generated on ${format(new Date(), 'dd MMM yyyy HH:mm')} UTC</p>
+    </div>
+  </div>
+</body>
+</html>
+  `.trim();
+}
+
+export async function sendDamageReport(
+  report: FullDamageReport,
+  to: string,
+  subject: string,
+  bodyText: string,
+  includePhotos: boolean,
+  sentByUserId: string
+): Promise<void> {
+  const transporter = createTransporter();
+  const html = buildEmailHtml(report, bodyText);
+
+  const attachments: { filename: string; path: string }[] = [];
+
+  if (includePhotos && 'photos' in report && Array.isArray(report.photos)) {
+    const uploadsAbsolute = path.resolve(process.cwd(), UPLOAD_DIR);
+    for (const photo of report.photos as { path: string; originalName: string; filename: string }[]) {
+      const absolutePath = path.join(
+        uploadsAbsolute,
+        photo.path.replace('/uploads/', '')
+      );
+      if (fs.existsSync(absolutePath)) {
+        attachments.push({
+          filename: photo.originalName || photo.filename,
+          path: absolutePath,
+        });
+      }
+    }
+  }
+
+  await transporter.sendMail({
+    from: process.env.SMTP_FROM || 'noreply@damagetrack.local',
+    to,
+    subject,
+    html,
+    attachments,
+  });
+
+  await prisma.emailExport.create({
+    data: {
+      damageReportId: report.id,
+      sentTo: to,
+      sentBy: sentByUserId,
+      subject,
+      includePhotos,
+    },
+  });
+
+  logger.info('Damage report email sent', {
+    referenceNumber: report.referenceNumber,
+    to,
+    attachments: attachments.length,
+  });
+}

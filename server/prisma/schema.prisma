@@ -1,0 +1,205 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  WAREHOUSE_USER
+}
+
+enum DamageStatus {
+  DRAFT
+  REPORTED
+  UNDER_REVIEW
+  CUSTOMER_NOTIFIED
+  CLAIM_FILED
+  RESOLVED
+  WRITTEN_OFF
+  CLOSED
+}
+
+enum DamageSeverity {
+  MINOR
+  MODERATE
+  MAJOR
+  TOTAL_LOSS
+}
+
+enum DamageCause {
+  FORKLIFT_IMPACT
+  DROPPED_DURING_HANDLING
+  WATER_DAMAGE
+  CRUSH_DAMAGE
+  PALLET_FAILURE
+  TEMPERATURE_EXPOSURE
+  INCORRECT_STACKING
+  TRANSIT_DAMAGE_INBOUND
+  TRANSIT_DAMAGE_OUTBOUND
+  PEST_DAMAGE
+  EXPIRED_PRODUCT
+  PACKAGING_FAILURE
+  UNKNOWN
+  OTHER
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  username      String    @unique
+  password      String
+  firstName     String
+  lastName      String
+  role          Role      @default(WAREHOUSE_USER)
+  isActive      Boolean   @default(true)
+  lastLogin     DateTime?
+  mustChangePassword Boolean @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  damagesReported  DamageReport[]  @relation("ReportedBy")
+  damagesReviewed  DamageReport[]  @relation("ReviewedBy")
+  auditLogs        AuditLog[]
+  comments         DamageComment[]
+}
+
+model Customer {
+  id            String    @id @default(cuid())
+  name          String
+  code          String    @unique
+  email         String?
+  phone         String?
+  contactName   String?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  products      Product[]
+  damages       DamageReport[]
+}
+
+model Product {
+  id            String    @id @default(cuid())
+  sku           String
+  name          String
+  barcode       String?
+  description   String?
+  unitValue     Decimal?  @db.Decimal(10, 2)
+  customerId    String
+  customer      Customer  @relation(fields: [customerId], references: [id])
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  damages       DamageReport[]
+
+  @@unique([sku, customerId])
+}
+
+model DamageReport {
+  id                String          @id @default(cuid())
+  referenceNumber   String          @unique
+
+  customerId        String
+  customer          Customer        @relation(fields: [customerId], references: [id])
+  productId         String
+  product           Product         @relation(fields: [productId], references: [id])
+
+  quantity          Int
+  severity          DamageSeverity
+  cause             DamageCause
+  causeOther        String?
+  description       String
+  locationInWarehouse String?
+
+  status            DamageStatus     @default(DRAFT)
+  estimatedLoss     Decimal?         @db.Decimal(10, 2)
+
+  reportedById      String
+  reportedBy        User             @relation("ReportedBy", fields: [reportedById], references: [id])
+  reviewedById      String?
+  reviewedBy        User?            @relation("ReviewedBy", fields: [reviewedById], references: [id])
+  dateOfDamage      DateTime
+  dateReported      DateTime         @default(now())
+  dateResolved      DateTime?
+
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  photos            DamagePhoto[]
+  comments          DamageComment[]
+  statusHistory     StatusHistory[]
+  emailExports      EmailExport[]
+}
+
+model DamagePhoto {
+  id              String    @id @default(cuid())
+  damageReportId  String
+  damageReport    DamageReport @relation(fields: [damageReportId], references: [id], onDelete: Cascade)
+  filename        String
+  originalName    String
+  mimeType        String
+  size            Int
+  path            String
+  thumbnailPath   String?
+  caption         String?
+  isPrimary       Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+}
+
+model DamageComment {
+  id              String    @id @default(cuid())
+  damageReportId  String
+  damageReport    DamageReport @relation(fields: [damageReportId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User      @relation(fields: [userId], references: [id])
+  content         String
+  createdAt       DateTime  @default(now())
+}
+
+model StatusHistory {
+  id              String    @id @default(cuid())
+  damageReportId  String
+  damageReport    DamageReport @relation(fields: [damageReportId], references: [id], onDelete: Cascade)
+  fromStatus      DamageStatus?
+  toStatus        DamageStatus
+  changedBy       String
+  changedByUser   String?
+  note            String?
+  createdAt       DateTime  @default(now())
+}
+
+model EmailExport {
+  id              String    @id @default(cuid())
+  damageReportId  String
+  damageReport    DamageReport @relation(fields: [damageReportId], references: [id], onDelete: Cascade)
+  sentTo          String
+  sentBy          String
+  subject         String
+  includePhotos   Boolean   @default(true)
+  sentAt          DateTime  @default(now())
+}
+
+model AuditLog {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  action      String
+  entity      String
+  entityId    String?
+  details     Json?
+  ipAddress   String?
+  createdAt   DateTime  @default(now())
+}
+
+model SystemSetting {
+  id          String    @id @default(cuid())
+  key         String    @unique
+  value       String
+  updatedAt   DateTime  @updatedAt
+}
