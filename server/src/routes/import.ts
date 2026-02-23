@@ -76,6 +76,26 @@ const userImportSchema = z.object({
   role: z.nativeEnum(Role).optional(),
 });
 
+/**
+ * @swagger
+ * /import/customers:
+ *   post:
+ *     summary: Bulk import customers from CSV (manager/admin)
+ *     tags: [Import]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: Import result with created count and errors
+ */
 // POST /api/import/customers
 router.post('/customers', requireManagerOrAdmin, csvUpload.single('file'), async (req: Request, res: Response) => {
   if (!req.file) {
@@ -141,6 +161,26 @@ router.post('/customers', requireManagerOrAdmin, csvUpload.single('file'), async
   res.json({ data: { created, errors } });
 });
 
+/**
+ * @swagger
+ * /import/products:
+ *   post:
+ *     summary: Bulk import products from CSV (manager/admin)
+ *     tags: [Import]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: Import result
+ */
 // POST /api/import/products
 router.post('/products', requireManagerOrAdmin, csvUpload.single('file'), async (req: Request, res: Response) => {
   if (!req.file) {
@@ -231,6 +271,26 @@ router.post('/products', requireManagerOrAdmin, csvUpload.single('file'), async 
   res.json({ data: { created, errors } });
 });
 
+/**
+ * @swagger
+ * /import/users:
+ *   post:
+ *     summary: Bulk import users from CSV (admin only)
+ *     tags: [Import]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: Import result
+ */
 // POST /api/import/users
 router.post('/users', requireAdmin, csvUpload.single('file'), async (req: Request, res: Response) => {
   if (!req.file) {

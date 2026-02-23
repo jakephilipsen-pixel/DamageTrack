@@ -11,6 +11,7 @@ export interface DamageFilters {
   customerId?: string;
   dateFrom?: string;
   dateTo?: string;
+  reportedById?: string;
 }
 
 export async function getDamages(filters: DamageFilters = {}): Promise<PaginatedResponse<DamageReport>> {
@@ -71,6 +72,15 @@ export async function setPrimaryPhoto(photoId: string): Promise<void> {
 
 export async function updatePhotoCaption(photoId: string, caption: string): Promise<void> {
   await apiClient.patch(`/photos/${photoId}/caption`, { caption });
+}
+
+export async function bulkStatusChange(payload: {
+  ids: string[];
+  status: DamageStatus;
+  note?: string;
+}): Promise<{ updated: number; skipped: { id: string; reason: string }[] }> {
+  const { data } = await apiClient.patch('/damages/bulk-status', payload);
+  return data;
 }
 
 export async function sendEmailReport(damageId: string, payload: {

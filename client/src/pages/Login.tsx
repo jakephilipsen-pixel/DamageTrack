@@ -53,7 +53,7 @@ export default function Login() {
       if (user?.mustChangePassword) {
         setShowChangePassword(true);
       } else {
-        navigate('/dashboard');
+        navigate(user?.role === 'WAREHOUSE_USER' ? '/damages' : '/dashboard');
       }
     }
   }, [isAuthenticated, user, navigate]);

@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Menu, Bell, User, KeyRound, LogOut } from 'lucide-react';
+import { Menu, User, KeyRound, LogOut } from 'lucide-react';
 import { Button } from '../ui/button';
+import { NotificationBell } from './NotificationBell';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -93,10 +94,7 @@ export function Header({ onMenuClick }: HeaderProps) {
           <h1 className="font-semibold text-lg">{pageTitle}</h1>
         </div>
 
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-5 w-5" />
-          <span className="sr-only">Notifications</span>
-        </Button>
+        <NotificationBell />
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

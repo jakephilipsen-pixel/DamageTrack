@@ -7,9 +7,13 @@ import cookieParser from 'cookie-parser';
 import path from 'path';
 import fs from 'fs';
 
+import { validateEnv } from './utils/validateEnv';
+validateEnv();
+
 import logger from './utils/logger';
 import { errorHandler, notFound } from './middleware/errorHandler';
 import { authenticate } from './middleware/auth';
+import { swaggerUi, swaggerSpec } from './config/swagger';
 import authRoutes from './routes/auth';
 import damageRoutes from './routes/damages';
 import customerRoutes from './routes/customers';
@@ -20,6 +24,7 @@ import userRoutes from './routes/users';
 import exportRoutes from './routes/export';
 import adminRoutes from './routes/admin';
 import importRoutes from './routes/import';
+import notificationRoutes from './routes/notifications';
 
 const app = express();
 const PORT = process.env.APP_PORT || 3001;
@@ -76,6 +81,7 @@ app.get('/health', (_req, res) => {
   });
 });
 
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use('/api/auth', authRoutes);
 app.use('/api/damages', authenticate, damageRoutes);
 app.use('/api/customers', authenticate, customerRoutes);
@@ -86,6 +92,7 @@ app.use('/api/users', authenticate, userRoutes);
 app.use('/api/export', authenticate, exportRoutes);
 app.use('/api/admin', authenticate, adminRoutes);
 app.use('/api/import', authenticate, importRoutes);
+app.use('/api/notifications', authenticate, notificationRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

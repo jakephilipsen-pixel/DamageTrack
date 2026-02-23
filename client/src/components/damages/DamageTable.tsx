@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Eye, MoreHorizontal } from 'lucide-react';
+import { Eye, MoreHorizontal, X, ChevronRight } from 'lucide-react';
 import {
   Table, TableHeader, TableBody, TableRow, TableHead, TableCell
 } from '../ui/table';
@@ -12,18 +13,29 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../ui/alert-dialog';
 import { StatusBadge, SeverityBadge } from './StatusBadge';
 import { Skeleton } from '../ui/skeleton';
 import { DamageReport, DamageStatus } from '../../types';
 import { formatDate, CAUSE_LABELS, STATUS_LABELS } from '../../utils/formatters';
-import { useChangeStatus } from '../../hooks/useDamages';
+import { useChangeStatus, useBulkStatusChange } from '../../hooks/useDamages';
+import { useAuth } from '../../hooks/useAuth';
 
 const STATUS_TRANSITIONS: Record<DamageStatus, DamageStatus[]> = {
   DRAFT: ['REPORTED'],
-  REPORTED: ['UNDER_REVIEW', 'DRAFT'],
-  UNDER_REVIEW: ['CUSTOMER_NOTIFIED', 'CLAIM_FILED', 'RESOLVED'],
-  CUSTOMER_NOTIFIED: ['CLAIM_FILED', 'RESOLVED', 'WRITTEN_OFF'],
-  CLAIM_FILED: ['RESOLVED', 'WRITTEN_OFF'],
+  REPORTED: ['UNDER_REVIEW', 'CLOSED'],
+  UNDER_REVIEW: ['CUSTOMER_NOTIFIED', 'CLAIM_FILED', 'RESOLVED', 'CLOSED'],
+  CUSTOMER_NOTIFIED: ['CLAIM_FILED', 'RESOLVED', 'CLOSED'],
+  CLAIM_FILED: ['RESOLVED', 'WRITTEN_OFF', 'CLOSED'],
   RESOLVED: ['CLOSED'],
   WRITTEN_OFF: ['CLOSED'],
   CLOSED: [],
@@ -42,7 +54,57 @@ interface DamageTableProps {
 
 export function DamageTable({ damages, isLoading, pagination, onPageChange }: DamageTableProps) {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const changeStatus = useChangeStatus();
+  const bulkStatusChange = useBulkStatusChange();
+  const isManagerOrAdmin = user?.role === 'ADMIN' || user?.role === 'MANAGER';
+
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [pendingBulkStatus, setPendingBulkStatus] = useState<DamageStatus | null>(null);
+
+  const allSelected = damages.length > 0 && damages.every((d) => selectedIds.has(d.id));
+  const someSelected = selectedIds.size > 0;
+
+  const toggleAll = () => {
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(damages.map((d) => d.id)));
+    }
+  };
+
+  const toggleOne = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const selectedDamages = damages.filter((d) => selectedIds.has(d.id));
+  const bulkTransitionOptions: DamageStatus[] = (() => {
+    if (selectedDamages.length === 0) return [];
+    const sets = selectedDamages.map((d) => new Set(STATUS_TRANSITIONS[d.status]));
+    const intersection = [...sets[0]].filter((s) => sets.every((set) => set.has(s)));
+    return intersection;
+  })();
+
+  const handleBulkStatusConfirm = () => {
+    if (!pendingBulkStatus) return;
+    bulkStatusChange.mutate(
+      { ids: [...selectedIds], status: pendingBulkStatus },
+      {
+        onSuccess: () => {
+          setSelectedIds(new Set());
+          setPendingBulkStatus(null);
+        },
+        onError: () => {
+          setPendingBulkStatus(null);
+        },
+      }
+    );
+  };
 
   if (isLoading) {
     return (
@@ -63,20 +125,108 @@ export function DamageTable({ damages, isLoading, pagination, onPageChange }: Da
     );
   }
 
+  const BulkActionBar = () => (
+    someSelected && isManagerOrAdmin ? (
+      <div className="flex items-center gap-3 rounded-md border bg-muted/60 px-4 py-2 text-sm">
+        <span className="font-medium">{selectedIds.size} selected</span>
+        {bulkTransitionOptions.length > 0 && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">Change Status</Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuLabel>Set status to…</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {bulkTransitionOptions.map((s) => (
+                <DropdownMenuItem key={s} onClick={() => setPendingBulkStatus(s)}>
+                  {STATUS_LABELS[s]}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+        <Button variant="ghost" size="sm" className="ml-auto" onClick={() => setSelectedIds(new Set())}>
+          <X className="h-4 w-4 mr-1" />
+          Clear
+        </Button>
+      </div>
+    ) : null
+  );
+
   return (
     <div className="space-y-4">
-      <div className="rounded-md border">
+      <BulkActionBar />
+
+      {/* ── Mobile card list (hidden on md+) ── */}
+      <div className="md:hidden space-y-2">
+        {damages.map((damage) => (
+          <div
+            key={damage.id}
+            className="rounded-lg border p-3 cursor-pointer hover:bg-muted/40 active:bg-muted/60 transition-colors"
+            onClick={() => navigate(`/damages/${damage.id}`)}
+          >
+            <div className="flex items-start gap-3">
+              {isManagerOrAdmin && (
+                <input
+                  type="checkbox"
+                  checked={selectedIds.has(damage.id)}
+                  onChange={() => toggleOne(damage.id)}
+                  onClick={(e) => e.stopPropagation()}
+                  className="mt-1 h-4 w-4 shrink-0 rounded border-input"
+                  aria-label={`Select ${damage.referenceNumber}`}
+                />
+              )}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-mono text-xs font-bold text-primary">
+                    {damage.referenceNumber}
+                  </span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <StatusBadge status={damage.status} />
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                </div>
+                <p className="text-sm font-medium mt-1 truncate">{damage.customer?.name}</p>
+                <p className="text-xs text-muted-foreground truncate">{damage.product?.name}</p>
+                <div className="flex items-center gap-2 mt-2 flex-wrap">
+                  <SeverityBadge severity={damage.severity} />
+                  <span className="text-xs text-muted-foreground">{formatDate(damage.dateOfDamage)}</span>
+                  <span className="text-xs text-muted-foreground ml-auto">
+                    {damage.reportedBy?.firstName} {damage.reportedBy?.lastName}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Desktop / tablet table (hidden below md) ── */}
+      <div className="hidden md:block overflow-x-auto rounded-md border">
         <Table>
           <TableHeader>
             <TableRow>
+              {isManagerOrAdmin && (
+                <TableHead className="w-10">
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    onChange={toggleAll}
+                    className="h-4 w-4 rounded border-input"
+                    aria-label="Select all"
+                  />
+                </TableHead>
+              )}
               <TableHead>Reference</TableHead>
               <TableHead>Date</TableHead>
               <TableHead>Customer</TableHead>
               <TableHead>Product</TableHead>
               <TableHead>Severity</TableHead>
-              <TableHead>Cause</TableHead>
+              {/* Cause: visible on xl+ only */}
+              <TableHead className="hidden xl:table-cell">Cause</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Reported By</TableHead>
+              {/* Reported By: visible on lg+ only */}
+              <TableHead className="hidden lg:table-cell">Reported By</TableHead>
               <TableHead className="w-24">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -87,6 +237,17 @@ export function DamageTable({ damages, isLoading, pagination, onPageChange }: Da
                 className="cursor-pointer"
                 onClick={() => navigate(`/damages/${damage.id}`)}
               >
+                {isManagerOrAdmin && (
+                  <TableCell onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(damage.id)}
+                      onChange={() => toggleOne(damage.id)}
+                      className="h-4 w-4 rounded border-input"
+                      aria-label={`Select ${damage.referenceNumber}`}
+                    />
+                  </TableCell>
+                )}
                 <TableCell>
                   <span className="font-mono text-xs font-semibold text-primary">
                     {damage.referenceNumber}
@@ -110,13 +271,13 @@ export function DamageTable({ damages, isLoading, pagination, onPageChange }: Da
                 <TableCell>
                   <SeverityBadge severity={damage.severity} />
                 </TableCell>
-                <TableCell className="text-sm">
+                <TableCell className="hidden xl:table-cell text-sm">
                   {CAUSE_LABELS[damage.cause]}
                 </TableCell>
                 <TableCell>
                   <StatusBadge status={damage.status} />
                 </TableCell>
-                <TableCell className="text-sm">
+                <TableCell className="hidden lg:table-cell text-sm">
                   {damage.reportedBy?.firstName} {damage.reportedBy?.lastName}
                 </TableCell>
                 <TableCell onClick={(e) => e.stopPropagation()}>
@@ -158,10 +319,12 @@ export function DamageTable({ damages, isLoading, pagination, onPageChange }: Da
         </Table>
       </div>
 
+      {/* Pagination */}
       {pagination && pagination.totalPages > 1 && (
         <div className="flex items-center justify-between px-2">
           <p className="text-sm text-muted-foreground">
-            Showing page {pagination.page} of {pagination.totalPages} ({pagination.total} total)
+            Page {pagination.page} of {pagination.totalPages}
+            <span className="hidden sm:inline"> ({pagination.total} total)</span>
           </p>
           <div className="flex items-center gap-2">
             <Button
@@ -183,6 +346,27 @@ export function DamageTable({ damages, isLoading, pagination, onPageChange }: Da
           </div>
         </div>
       )}
+
+      {/* Bulk status confirmation dialog */}
+      <AlertDialog
+        open={pendingBulkStatus !== null}
+        onOpenChange={(open) => { if (!open) setPendingBulkStatus(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Bulk Status Change</AlertDialogTitle>
+            <AlertDialogDescription>
+              Change {selectedIds.size} report(s) to{' '}
+              <strong>{pendingBulkStatus ? STATUS_LABELS[pendingBulkStatus] : ''}</strong>?
+              Some reports may be skipped if the transition is not valid.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBulkStatusConfirm}>Confirm</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

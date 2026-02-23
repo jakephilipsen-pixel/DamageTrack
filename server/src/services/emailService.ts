@@ -132,6 +132,93 @@ function buildEmailHtml(
   `.trim();
 }
 
+export async function sendStatusChangeNotification(
+  report: FullDamageReport,
+  changedByUsername: string
+): Promise<void> {
+  if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    return;
+  }
+
+  const lastHistory = Array.isArray((report as any).statusHistory) && (report as any).statusHistory.length > 0
+    ? (report as any).statusHistory[(report as any).statusHistory.length - 1]
+    : null;
+
+  const fromStatus = lastHistory?.fromStatus ? formatLabel(lastHistory.fromStatus) : 'N/A';
+  const toStatus = formatLabel(report.status);
+  const note = lastHistory?.note || '';
+  const timestamp = format(new Date(), 'dd MMM yyyy HH:mm') + ' UTC';
+  const companyName = process.env.COMPANY_NAME || 'DamageTrack';
+
+  const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Status Update — ${report.referenceNumber}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; background: #f3f4f6; }
+    .wrapper { max-width: 580px; margin: 0 auto; background: #fff; }
+    .header { background: #1e3a5f; color: #fff; padding: 24px 32px; }
+    .header h1 { margin: 0; font-size: 20px; }
+    .header p { margin: 4px 0 0; font-size: 13px; opacity: 0.8; }
+    .content { padding: 32px; font-size: 14px; color: #374151; line-height: 1.6; }
+    .status-row { display: flex; align-items: center; gap: 12px; margin: 16px 0; }
+    .badge { display: inline-block; padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: 700; color: #fff; }
+    .note-box { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; padding: 12px 16px; margin-top: 16px; }
+    .footer { background: #f3f4f6; padding: 16px 32px; font-size: 12px; color: #9ca3af; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="header">
+      <h1>${companyName} — Status Update</h1>
+      <p>Reference: <strong>${report.referenceNumber}</strong></p>
+    </div>
+    <div class="content">
+      <p>The status of damage report <strong>${report.referenceNumber}</strong> has been updated by <strong>${changedByUsername}</strong>.</p>
+      <div class="status-row">
+        <span class="badge" style="background:${getStatusColor(lastHistory?.fromStatus || '')}">${fromStatus}</span>
+        <span>→</span>
+        <span class="badge" style="background:${getStatusColor(report.status)}">${toStatus}</span>
+      </div>
+      ${note ? `<div class="note-box"><strong>Note:</strong> ${note}</div>` : ''}
+      <p style="margin-top:16px;color:#6b7280;font-size:13px;">Changed on ${timestamp}</p>
+    </div>
+    <div class="footer">
+      <p>This email was sent by <strong>${companyName}</strong> Warehouse Damage Management System.</p>
+    </div>
+  </div>
+</body>
+</html>`.trim();
+
+  const transporter = createTransporter();
+  const subject = `[${companyName}] Status Update: ${report.referenceNumber} → ${toStatus}`;
+
+  const recipients: string[] = [];
+  if (report.reportedBy?.email) {
+    recipients.push(report.reportedBy.email);
+  }
+  if (report.status === 'CUSTOMER_NOTIFIED' && report.customer?.email) {
+    recipients.push(report.customer.email);
+  }
+
+  if (recipients.length === 0) return;
+
+  await transporter.sendMail({
+    from: process.env.SMTP_FROM || 'noreply@damagetrack.local',
+    to: recipients.join(', '),
+    subject,
+    html,
+  });
+
+  logger.info('Status change notification sent', {
+    referenceNumber: report.referenceNumber,
+    toStatus: report.status,
+    recipients,
+  });
+}
+
 export async function sendDamageReport(
   report: FullDamageReport,
   to: string,

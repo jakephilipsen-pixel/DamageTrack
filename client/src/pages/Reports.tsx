@@ -109,14 +109,14 @@ export default function Reports() {
       {/* Date Range Filter */}
       <Card>
         <CardContent className="pt-4">
-          <div className="flex flex-wrap gap-4 items-end">
+          <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:gap-4 sm:items-end">
             <div>
               <Label className="text-xs">Date From</Label>
               <Input
                 type="date"
                 value={dateFrom}
                 onChange={(e) => setDateFrom(e.target.value)}
-                className="w-40 h-9 mt-1"
+                className="w-full sm:w-40 h-9 mt-1"
               />
             </div>
             <div>
@@ -125,13 +125,13 @@ export default function Reports() {
                 type="date"
                 value={dateTo}
                 onChange={(e) => setDateTo(e.target.value)}
-                className="w-40 h-9 mt-1"
+                className="w-full sm:w-40 h-9 mt-1"
               />
             </div>
             <div>
               <Label className="text-xs">Export: Customer</Label>
               <Select value={exportCustomer} onValueChange={setExportCustomer}>
-                <SelectTrigger className="w-44 h-9 mt-1">
+                <SelectTrigger className="w-full sm:w-44 h-9 mt-1">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -145,7 +145,7 @@ export default function Reports() {
             <div>
               <Label className="text-xs">Export: Status</Label>
               <Select value={exportStatus} onValueChange={setExportStatus}>
-                <SelectTrigger className="w-44 h-9 mt-1">
+                <SelectTrigger className="w-full sm:w-44 h-9 mt-1">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

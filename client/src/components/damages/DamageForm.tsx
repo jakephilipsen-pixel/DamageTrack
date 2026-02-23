@@ -320,7 +320,7 @@ export function DamageForm() {
               <CardTitle>Damage Details</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="quantity">Quantity Damaged *</Label>
                   <Input
@@ -345,7 +345,7 @@ export function DamageForm() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label>Severity *</Label>
                   <Controller
@@ -462,7 +462,7 @@ export function DamageForm() {
               <p className="text-sm text-muted-foreground">Please review the details before submitting.</p>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Customer</p>
                   <p className="mt-1 font-medium">{selectedCustomer?.name}</p>
@@ -477,7 +477,7 @@ export function DamageForm() {
 
               <hr />
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 <div>
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Quantity</p>
                   <p className="mt-1 font-medium">{values.quantity} units</p>
@@ -494,7 +494,7 @@ export function DamageForm() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Date of Damage</p>
                   <p className="mt-1 font-medium">

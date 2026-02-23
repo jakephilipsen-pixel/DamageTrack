@@ -42,3 +42,7 @@ Thumbs.db
 
 # Prisma
 server/prisma/migrations/*.sql
+
+# SSL certificates — never commit private keys
+nginx/certs/*.crt
+nginx/certs/*.key

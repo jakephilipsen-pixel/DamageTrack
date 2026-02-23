@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getDamages, getDamage, createDamage, updateDamage, deleteDamage, changeStatus } from '../api/damages';
+import { getDamages, getDamage, createDamage, updateDamage, deleteDamage, changeStatus, bulkStatusChange } from '../api/damages';
 import { DamageFilters } from '../api/damages';
 import { toast } from 'sonner';
 
@@ -72,6 +72,24 @@ export function useChangeStatus() {
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.error || 'Failed to update status');
+    },
+  });
+}
+
+export function useBulkStatusChange() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: bulkStatusChange,
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['damages'] });
+      if (result.skipped.length > 0) {
+        toast.warning(`Updated ${result.updated}, skipped ${result.skipped.length} report(s)`);
+      } else {
+        toast.success(`${result.updated} report(s) updated`);
+      }
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.error || 'Bulk status change failed');
     },
   });
 }

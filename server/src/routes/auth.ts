@@ -1,11 +1,20 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
+import rateLimit from 'express-rate-limit';
 import { validate } from '../middleware/validate';
 import { authenticate } from '../middleware/auth';
 import * as authService from '../services/authService';
 import prisma from '../config/database';
 
 const router = Router();
+
+const loginRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many login attempts, please try again later' },
+});
 
 const REFRESH_COOKIE_NAME = 'refresh_token';
 const REFRESH_COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
@@ -26,7 +35,34 @@ const changePasswordSchema = z.object({
     ),
 });
 
-router.post('/login', validate(loginSchema), async (req: Request, res: Response) => {
+/**
+ * @swagger
+ * /auth/login:
+ *   post:
+ *     summary: Login with username and password
+ *     tags: [Auth]
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [username, password]
+ *             properties:
+ *               username:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Login successful
+ *       401:
+ *         description: Invalid credentials
+ *       429:
+ *         description: Too many login attempts
+ */
+router.post('/login', loginRateLimiter, validate(loginSchema), async (req: Request, res: Response) => {
   const { username, password } = req.body as { username: string; password: string };
 
   const result = await authService.login(username, password);
@@ -46,6 +82,19 @@ router.post('/login', validate(loginSchema), async (req: Request, res: Response)
   });
 });
 
+/**
+ * @swagger
+ * /auth/refresh:
+ *   post:
+ *     summary: Refresh access token using refresh cookie
+ *     tags: [Auth]
+ *     security: []
+ *     responses:
+ *       200:
+ *         description: New access token issued
+ *       401:
+ *         description: No or invalid refresh token
+ */
 router.post('/refresh', async (req: Request, res: Response) => {
   const refreshToken = req.cookies[REFRESH_COOKIE_NAME] as string | undefined;
 

@@ -11,7 +11,7 @@ interface RoleGuardProps {
 export function RoleGuard({ roles, children }: RoleGuardProps) {
   const { user } = useAuth();
   if (!user || !roles.includes(user.role)) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/damages" replace />;
   }
   return <>{children}</>;
 }

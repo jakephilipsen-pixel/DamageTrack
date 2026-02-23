@@ -3,6 +3,17 @@ import prisma from '../config/database';
 import { generateReferenceNumber } from '../utils/helpers';
 import { DamageFilters } from '../types';
 
+const VALID_TRANSITIONS: Record<DamageStatus, DamageStatus[]> = {
+  DRAFT: ['REPORTED'],
+  REPORTED: ['UNDER_REVIEW', 'CLOSED'],
+  UNDER_REVIEW: ['CUSTOMER_NOTIFIED', 'CLAIM_FILED', 'RESOLVED', 'CLOSED'],
+  CUSTOMER_NOTIFIED: ['CLAIM_FILED', 'RESOLVED', 'CLOSED'],
+  CLAIM_FILED: ['RESOLVED', 'WRITTEN_OFF', 'CLOSED'],
+  RESOLVED: ['CLOSED'],
+  WRITTEN_OFF: ['CLOSED'],
+  CLOSED: [],
+};
+
 const damageIncludeFull = {
   customer: true,
   product: {
@@ -288,6 +299,14 @@ export async function changeStatus(
 
   if (!existing) {
     throw Object.assign(new Error('Damage report not found'), { status: 404 });
+  }
+
+  const allowed = VALID_TRANSITIONS[existing.status];
+  if (!allowed.includes(newStatus)) {
+    throw Object.assign(
+      new Error(`Invalid status transition from ${existing.status} to ${newStatus}`),
+      { status: 400 }
+    );
   }
 
   const updateData: Prisma.DamageReportUpdateInput = {

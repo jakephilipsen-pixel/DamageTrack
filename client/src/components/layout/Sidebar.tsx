@@ -1,4 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom';
+import React from 'react';
 import {
   LayoutDashboard,
   AlertTriangle,
@@ -15,15 +16,23 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '../../hooks/useAuth';
 import { Button } from '../ui/button';
 
+interface NavItem {
+  to: string;
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  labelWarehouse?: string;
+  roles: string[];
+}
+
 interface SidebarProps {
   onNavClick?: () => void;
 }
 
 const navItems = [
-  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', roles: ['ADMIN', 'MANAGER', 'WAREHOUSE_USER'] },
-  { to: '/damages', icon: AlertTriangle, label: 'Damage Reports', roles: ['ADMIN', 'MANAGER', 'WAREHOUSE_USER'] },
-  { to: '/customers', icon: Building2, label: 'Customers', roles: ['ADMIN', 'MANAGER', 'WAREHOUSE_USER'] },
-  { to: '/products', icon: Package, label: 'Products', roles: ['ADMIN', 'MANAGER', 'WAREHOUSE_USER'] },
+  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', roles: ['ADMIN', 'MANAGER'] },
+  { to: '/damages', icon: AlertTriangle, label: 'Damage Reports', labelWarehouse: 'My Reports', roles: ['ADMIN', 'MANAGER', 'WAREHOUSE_USER'] },
+  { to: '/customers', icon: Building2, label: 'Customers', roles: ['ADMIN', 'MANAGER'] },
+  { to: '/products', icon: Package, label: 'Products', roles: ['ADMIN', 'MANAGER'] },
   { to: '/reports', icon: BarChart3, label: 'Reports', roles: ['ADMIN', 'MANAGER'] },
 ];
 
@@ -94,7 +103,7 @@ export function Sidebar({ onNavClick }: SidebarProps) {
             }
           >
             <item.icon className="w-4 h-4 shrink-0" />
-            {item.label}
+            {user?.role === 'WAREHOUSE_USER' && item.labelWarehouse ? item.labelWarehouse : item.label}
           </NavLink>
         ))}
 

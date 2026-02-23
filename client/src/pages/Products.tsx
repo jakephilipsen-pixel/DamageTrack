@@ -147,29 +147,29 @@ export default function Products() {
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => setShowImport(true)} className="gap-2">
               <Upload className="h-4 w-4" />
-              Import CSV
+              <span className="hidden sm:inline">Import CSV</span>
             </Button>
             <Button onClick={openCreate} className="gap-2">
               <Plus className="h-4 w-4" />
-              Add Product
+              <span className="hidden sm:inline">Add Product</span>
             </Button>
           </div>
         )}
       </div>
 
       {/* Filters */}
-      <div className="flex gap-3">
-        <div className="relative flex-1 max-w-sm">
+      <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+        <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
             placeholder="Search by SKU or name..."
-            className="pl-9"
+            className="pl-9 w-full"
           />
         </div>
         <Select value={selectedCustomer} onValueChange={(v) => { setSelectedCustomer(v); setPage(1); }}>
-          <SelectTrigger className="w-48">
+          <SelectTrigger className="w-full sm:w-48">
             <SelectValue placeholder="All Customers" />
           </SelectTrigger>
           <SelectContent>
@@ -181,74 +181,126 @@ export default function Products() {
         </Select>
       </div>
 
-      {/* Table */}
-      {isLoading ? (
+      {/* Loading skeletons */}
+      {isLoading && (
         <div className="space-y-2">
           {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}
         </div>
-      ) : (
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>SKU</TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead>Barcode</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead>Unit Value</TableHead>
-                <TableHead>Damages</TableHead>
-                <TableHead>Status</TableHead>
-                {canManage && <TableHead className="w-24">Actions</TableHead>}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {data?.data.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                    No products found
-                  </TableCell>
-                </TableRow>
-              ) : (
-                data?.data.map((product) => (
-                  <TableRow key={product.id}>
-                    <TableCell>
-                      <span className="font-mono text-xs font-semibold">{product.sku}</span>
-                    </TableCell>
-                    <TableCell className="font-medium">{product.name}</TableCell>
-                    <TableCell className="text-sm font-mono">{product.barcode || '—'}</TableCell>
-                    <TableCell className="text-sm">{product.customer?.name || '—'}</TableCell>
-                    <TableCell className="text-sm">{formatCurrency(product.unitValue)}</TableCell>
-                    <TableCell className="text-sm">{product._count?.damages ?? '—'}</TableCell>
-                    <TableCell>
-                      <Badge variant={product.isActive ? 'default' : 'secondary'}>
-                        {product.isActive ? 'Active' : 'Inactive'}
-                      </Badge>
-                    </TableCell>
+      )}
+
+      {!isLoading && (
+        <>
+          {/* ── Mobile card list (hidden on md+) ── */}
+          <div className="md:hidden space-y-2">
+            {data?.data.length === 0 ? (
+              <p className="text-center py-8 text-muted-foreground text-sm">No products found</p>
+            ) : (
+              data?.data.map((product) => (
+                <div key={product.id} className="rounded-lg border p-3 space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs font-bold text-primary">{product.sku}</span>
+                        <Badge variant={product.isActive ? 'default' : 'secondary'} className="text-xs">
+                          {product.isActive ? 'Active' : 'Inactive'}
+                        </Badge>
+                      </div>
+                      <p className="font-medium text-sm mt-0.5">{product.name}</p>
+                      <p className="text-xs text-muted-foreground">{product.customer?.name}</p>
+                    </div>
                     {canManage && (
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEdit(product)}>
-                            <Edit className="h-3.5 w-3.5" />
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEdit(product)}>
+                          <Edit className="h-3.5 w-3.5" />
+                        </Button>
+                        {canDelete && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 text-destructive hover:text-destructive"
+                            onClick={() => setDeleteTarget(product)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
                           </Button>
-                          {canDelete && (
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="h-8 w-8 text-destructive hover:text-destructive"
-                              onClick={() => setDeleteTarget(product)}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
+                        )}
+                      </div>
                     )}
+                  </div>
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    <span>{formatCurrency(product.unitValue)}/unit</span>
+                    <span>•</span>
+                    <span>{product._count?.damages ?? 0} damages</span>
+                    {product.barcode && <span className="font-mono truncate">{product.barcode}</span>}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* ── Desktop / tablet table (hidden below md) ── */}
+          <div className="hidden md:block rounded-md border overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>SKU</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead className="hidden lg:table-cell">Barcode</TableHead>
+                  <TableHead>Customer</TableHead>
+                  <TableHead>Unit Value</TableHead>
+                  <TableHead>Damages</TableHead>
+                  <TableHead>Status</TableHead>
+                  {canManage && <TableHead className="w-24">Actions</TableHead>}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {data?.data.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                      No products found
+                    </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+                ) : (
+                  data?.data.map((product) => (
+                    <TableRow key={product.id}>
+                      <TableCell>
+                        <span className="font-mono text-xs font-semibold">{product.sku}</span>
+                      </TableCell>
+                      <TableCell className="font-medium">{product.name}</TableCell>
+                      <TableCell className="text-sm font-mono hidden lg:table-cell">{product.barcode || '—'}</TableCell>
+                      <TableCell className="text-sm">{product.customer?.name || '—'}</TableCell>
+                      <TableCell className="text-sm">{formatCurrency(product.unitValue)}</TableCell>
+                      <TableCell className="text-sm">{product._count?.damages ?? '—'}</TableCell>
+                      <TableCell>
+                        <Badge variant={product.isActive ? 'default' : 'secondary'}>
+                          {product.isActive ? 'Active' : 'Inactive'}
+                        </Badge>
+                      </TableCell>
+                      {canManage && (
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEdit(product)}>
+                              <Edit className="h-3.5 w-3.5" />
+                            </Button>
+                            {canDelete && (
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-8 w-8 text-destructive hover:text-destructive"
+                                onClick={() => setDeleteTarget(product)}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </>
       )}
 
       {/* Pagination */}

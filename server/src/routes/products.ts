@@ -26,6 +26,25 @@ const updateProductSchema = z.object({
   isActive: z.boolean().optional(),
 });
 
+/**
+ * @swagger
+ * /products:
+ *   get:
+ *     summary: List products
+ *     tags: [Products]
+ *     parameters:
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: customerId
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Paginated product list
+ */
 router.get('/', async (req: Request, res: Response) => {
   const pagination = parsePaginationParams(req.query as Record<string, unknown>);
   const search = req.query.search as string | undefined;

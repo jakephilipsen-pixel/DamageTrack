@@ -34,6 +34,29 @@ const updateCustomerSchema = z.object({
   isActive: z.boolean().optional(),
 });
 
+/**
+ * @swagger
+ * /customers:
+ *   get:
+ *     summary: List customers
+ *     tags: [Customers]
+ *     parameters:
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Paginated customer list
+ */
 router.get('/', async (req: Request, res: Response) => {
   const pagination = parsePaginationParams(req.query as Record<string, unknown>);
   const search = req.query.search as string | undefined;
@@ -49,6 +72,36 @@ router.get('/', async (req: Request, res: Response) => {
   res.json(result);
 });
 
+/**
+ * @swagger
+ * /customers:
+ *   post:
+ *     summary: Create a customer (manager/admin)
+ *     tags: [Customers]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [name, code]
+ *             properties:
+ *               name:
+ *                 type: string
+ *               code:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *               phone:
+ *                 type: string
+ *               contactName:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Customer created
+ *       409:
+ *         description: Code already exists
+ */
 router.post('/', requireManagerOrAdmin, validate(createCustomerSchema), async (req: Request, res: Response) => {
   const customer = await customerService.createCustomer(
     req.body as Parameters<typeof customerService.createCustomer>[0]
