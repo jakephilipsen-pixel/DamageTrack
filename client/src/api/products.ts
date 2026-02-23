@@ -1,5 +1,5 @@
 import apiClient from './client';
-import { Product, PaginatedResponse } from '../types';
+import { Product, PaginatedResponse, ImportResult } from '../types';
 
 export async function getProducts(params: { search?: string; customerId?: string; page?: number; limit?: number } = {}): Promise<PaginatedResponse<Product>> {
   const { data } = await apiClient.get('/products', { params });
@@ -23,4 +23,13 @@ export async function updateProduct(id: string, payload: Partial<Product>): Prom
 
 export async function deleteProduct(id: string): Promise<void> {
   await apiClient.delete(`/products/${id}`);
+}
+
+export async function importProductsCSV(file: File): Promise<ImportResult> {
+  const form = new FormData();
+  form.append('file', file);
+  const { data } = await apiClient.post('/import/products', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return data;
 }

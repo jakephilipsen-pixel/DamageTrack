@@ -141,6 +141,11 @@ export interface PaginatedResponse<T> {
   };
 }
 
+export interface ImportResult {
+  created: number;
+  errors: { row: number; message: string; values: Record<string, string> }[];
+}
+
 export interface DashboardStats {
   totalToday: number;
   totalThisWeek: number;

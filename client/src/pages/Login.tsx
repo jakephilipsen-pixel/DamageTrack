@@ -26,7 +26,7 @@ type ChangePasswordForm = z.infer<typeof changePasswordSchema>;
 
 export default function Login() {
   const navigate = useNavigate();
-  const { login, isAuthenticated, user } = useAuth();
+  const { login, isAuthenticated, user, refreshUser } = useAuth();
   const [loginError, setLoginError] = useState('');
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [isChanging, setIsChanging] = useState(false);
@@ -71,12 +71,14 @@ export default function Login() {
     setIsChanging(true);
     try {
       await changePassword(data.currentPassword, data.newPassword);
-      toast.success('Password changed. Please log in again.');
+      await refreshUser();
+      toast.success('Password changed successfully.');
       setShowChangePassword(false);
       resetPwd();
       navigate('/dashboard');
     } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Failed to change password');
+      const detail = err.response?.data?.details?.[0]?.message;
+      toast.error(detail || err.response?.data?.error || 'Failed to change password');
     } finally {
       setIsChanging(false);
     }
@@ -173,8 +175,12 @@ export default function Login() {
             <div>
               <Label>New Password</Label>
               <Input type="password" {...registerPwd('newPassword')} className="mt-1" />
-              {pwdErrors.newPassword && (
+              {pwdErrors.newPassword ? (
                 <p className="text-xs text-destructive mt-1">{pwdErrors.newPassword.message}</p>
+              ) : (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Min 8 chars · uppercase · lowercase · number
+                </p>
               )}
             </div>
             <div>

@@ -31,8 +31,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     (async () => {
       try {
-        const { data } = await axios.post('/api/auth/refresh', {}, { withCredentials: true });
-        setAccessToken(data.accessToken);
+        const res = await axios.post('/api/auth/refresh', {}, { withCredentials: true });
+        const refreshData = res.data?.data ?? res.data;
+        setAccessToken(refreshData.accessToken);
         const userData = await getMe();
         setUser(userData);
       } catch {

@@ -20,14 +20,30 @@ apiClient.interceptors.request.use((config) => {
 });
 
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Unwrap the backend's { data: ... } single-key envelope so callers get the payload directly.
+    // Only unwrap when `data` is the sole key — paginated responses like { data, pagination }
+    // must remain intact so callers can access both fields.
+    if (
+      response.data &&
+      typeof response.data === 'object' &&
+      !Array.isArray(response.data) &&
+      Object.keys(response.data).length === 1 &&
+      'data' in response.data
+    ) {
+      response.data = response.data.data;
+    }
+    return response;
+  },
   async (error) => {
     const originalRequest = error.config;
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
       try {
-        const { data } = await axios.post('/api/auth/refresh', {}, { withCredentials: true });
-        accessToken = data.accessToken;
+        const res = await axios.post('/api/auth/refresh', {}, { withCredentials: true });
+        // Unwrap envelope from raw axios call too
+        const refreshData = res.data?.data ?? res.data;
+        accessToken = refreshData.accessToken;
         originalRequest.headers.Authorization = `Bearer ${accessToken}`;
         return apiClient(originalRequest);
       } catch {

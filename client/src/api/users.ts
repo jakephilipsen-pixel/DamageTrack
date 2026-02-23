@@ -1,9 +1,10 @@
 import apiClient from './client';
-import { User, AuditLog } from '../types';
+import { User, AuditLog, ImportResult } from '../types';
 
 export async function getUsers(): Promise<User[]> {
   const { data } = await apiClient.get('/users');
-  return data;
+  // Server returns { data: User[], pagination } — extract the array
+  return (data as { data: User[] }).data;
 }
 
 export async function createUser(payload: { email: string; username: string; firstName: string; lastName: string; role: string; password: string }): Promise<User> {
@@ -37,4 +38,13 @@ export async function getSettings(): Promise<Record<string, string>> {
 
 export async function updateSettings(settings: Record<string, string>): Promise<void> {
   await apiClient.put('/admin/settings', settings);
+}
+
+export async function importUsersCSV(file: File): Promise<ImportResult> {
+  const form = new FormData();
+  form.append('file', file);
+  const { data } = await apiClient.post('/import/users', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return data;
 }

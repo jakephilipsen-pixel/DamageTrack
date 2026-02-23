@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Plus, Edit, Trash2 } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Upload } from 'lucide-react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '../components/ui/button';
@@ -27,17 +27,21 @@ import { useAuth } from '../hooks/useAuth';
 import { customerSchema } from '../utils/validators';
 import { useDebounce } from '../hooks/useDebounce';
 import { z } from 'zod';
+import { CsvImportDialog } from '../components/ui/CsvImportDialog';
+import { useQueryClient } from '@tanstack/react-query';
 
 type CustomerForm = z.infer<typeof customerSchema>;
 
 export default function Customers() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const debouncedSearch = useDebounce(search, 400);
   const [editCustomer, setEditCustomer] = useState<Customer | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null);
+  const [showImport, setShowImport] = useState(false);
 
   const { data, isLoading } = useCustomers({ search: debouncedSearch, page, limit: 20 });
   const createMutation = useCreateCustomer();
@@ -105,10 +109,16 @@ export default function Customers() {
           </p>
         </div>
         {canManage && (
-          <Button onClick={openCreate} className="gap-2">
-            <Plus className="h-4 w-4" />
-            Add Customer
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setShowImport(true)} className="gap-2">
+              <Upload className="h-4 w-4" />
+              Import CSV
+            </Button>
+            <Button onClick={openCreate} className="gap-2">
+              <Plus className="h-4 w-4" />
+              Add Customer
+            </Button>
+          </div>
         )}
       </div>
 
@@ -249,6 +259,14 @@ export default function Customers() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* CSV Import */}
+      <CsvImportDialog
+        entity="customers"
+        open={showImport}
+        onOpenChange={setShowImport}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['customers'] })}
+      />
 
       {/* Delete Confirmation */}
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>

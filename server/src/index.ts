@@ -19,6 +19,7 @@ import reportRoutes from './routes/reports';
 import userRoutes from './routes/users';
 import exportRoutes from './routes/export';
 import adminRoutes from './routes/admin';
+import importRoutes from './routes/import';
 
 const app = express();
 const PORT = process.env.APP_PORT || 3001;
@@ -84,6 +85,7 @@ app.use('/api/reports', authenticate, reportRoutes);
 app.use('/api/users', authenticate, userRoutes);
 app.use('/api/export', authenticate, exportRoutes);
 app.use('/api/admin', authenticate, adminRoutes);
+app.use('/api/import', authenticate, importRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

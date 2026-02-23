@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Plus, Edit, Trash2 } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Upload } from 'lucide-react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -33,6 +33,7 @@ import { productSchema } from '../utils/validators';
 import { useDebounce } from '../hooks/useDebounce';
 import { formatCurrency } from '../utils/formatters';
 import { toast } from 'sonner';
+import { CsvImportDialog } from '../components/ui/CsvImportDialog';
 
 type ProductForm = z.infer<typeof productSchema>;
 
@@ -46,6 +47,7 @@ export default function Products() {
   const [editProduct, setEditProduct] = useState<Product | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
+  const [showImport, setShowImport] = useState(false);
 
   const params = {
     search: debouncedSearch || undefined,
@@ -142,10 +144,16 @@ export default function Products() {
           </p>
         </div>
         {canManage && (
-          <Button onClick={openCreate} className="gap-2">
-            <Plus className="h-4 w-4" />
-            Add Product
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setShowImport(true)} className="gap-2">
+              <Upload className="h-4 w-4" />
+              Import CSV
+            </Button>
+            <Button onClick={openCreate} className="gap-2">
+              <Plus className="h-4 w-4" />
+              Add Product
+            </Button>
+          </div>
         )}
       </div>
 
@@ -325,6 +333,14 @@ export default function Products() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* CSV Import */}
+      <CsvImportDialog
+        entity="products"
+        open={showImport}
+        onOpenChange={setShowImport}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['products'] })}
+      />
 
       {/* Delete Confirmation */}
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
