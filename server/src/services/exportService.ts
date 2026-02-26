@@ -236,14 +236,14 @@ export async function generatePDF(report: FullDamageReport): Promise<Buffer> {
   });
 }
 
-export async function generateCSV(filters: {
+function buildCsvWhere(filters: {
   dateFrom?: string;
   dateTo?: string;
   status?: DamageStatus;
   customerId?: string;
   severity?: DamageSeverity;
   cause?: DamageCause;
-}): Promise<string> {
+}): Prisma.DamageReportWhereInput {
   const where: Prisma.DamageReportWhereInput = {};
 
   if (filters.status) where.status = filters.status;
@@ -261,61 +261,110 @@ export async function generateCSV(filters: {
     }
   }
 
-  const reports = await prisma.damageReport.findMany({
-    where,
-    include: {
-      customer: { select: { name: true, code: true } },
-      product: { select: { sku: true, name: true } },
-      reportedBy: { select: { username: true, firstName: true, lastName: true } },
-    },
-    orderBy: { dateReported: 'desc' },
-  });
+  return where;
+}
 
-  const csvRows: string[] = [];
-
-  const headers = [
-    'Reference #',
-    'Date of Damage',
-    'Customer Code',
-    'Customer Name',
-    'Product SKU',
-    'Product Name',
-    'Quantity',
-    'Severity',
-    'Cause',
-    'Description',
-    'Status',
-    'Reporter',
-    'Estimated Loss',
-    'Date Reported',
-    'Date Resolved',
+function formatCsvRow(report: {
+  referenceNumber: string;
+  dateOfDamage: Date;
+  customer: { code: string; name: string };
+  product: { sku: string; name: string };
+  quantity: number;
+  severity: DamageSeverity | null;
+  cause: DamageCause;
+  causeOther: string | null;
+  description: string;
+  status: DamageStatus;
+  reportedBy: { firstName: string; lastName: string };
+  estimatedLoss: unknown;
+  dateReported: Date;
+  dateResolved: Date | null;
+}): string {
+  const cells = [
+    report.referenceNumber,
+    format(new Date(report.dateOfDamage), 'yyyy-MM-dd'),
+    report.customer.code,
+    report.customer.name,
+    report.product.sku,
+    report.product.name,
+    String(report.quantity),
+    formatLabel(report.severity),
+    formatLabel(report.cause) + (report.causeOther ? ` (${report.causeOther})` : ''),
+    report.description.replace(/"/g, '""'),
+    formatLabel(report.status),
+    `${report.reportedBy.firstName} ${report.reportedBy.lastName}`,
+    report.estimatedLoss !== null && report.estimatedLoss !== undefined
+      ? Number(report.estimatedLoss).toFixed(2)
+      : '',
+    format(new Date(report.dateReported), 'yyyy-MM-dd HH:mm:ss'),
+    report.dateResolved ? format(new Date(report.dateResolved), 'yyyy-MM-dd') : '',
   ];
+  return cells.map((cell) => `"${cell}"`).join(',');
+}
 
-  csvRows.push(headers.map((h) => `"${h}"`).join(','));
+const CSV_HEADERS = [
+  'Reference #',
+  'Date of Damage',
+  'Customer Code',
+  'Customer Name',
+  'Product SKU',
+  'Product Name',
+  'Quantity',
+  'Severity',
+  'Cause',
+  'Description',
+  'Status',
+  'Reporter',
+  'Estimated Loss',
+  'Date Reported',
+  'Date Resolved',
+];
 
-  for (const report of reports) {
-    const row = [
-      report.referenceNumber,
-      format(new Date(report.dateOfDamage), 'yyyy-MM-dd'),
-      report.customer.code,
-      report.customer.name,
-      report.product.sku,
-      report.product.name,
-      String(report.quantity),
-      formatLabel(report.severity),
-      formatLabel(report.cause) + (report.causeOther ? ` (${report.causeOther})` : ''),
-      report.description.replace(/"/g, '""'),
-      formatLabel(report.status),
-      `${report.reportedBy.firstName} ${report.reportedBy.lastName}`,
-      report.estimatedLoss !== null && report.estimatedLoss !== undefined
-        ? Number(report.estimatedLoss).toFixed(2)
-        : '',
-      format(new Date(report.dateReported), 'yyyy-MM-dd HH:mm:ss'),
-      report.dateResolved ? format(new Date(report.dateResolved), 'yyyy-MM-dd') : '',
-    ];
+const CSV_BATCH_SIZE = 500;
 
-    csvRows.push(row.map((cell) => `"${cell}"`).join(','));
+export async function streamCSV(
+  res: import('express').Response,
+  filters: {
+    dateFrom?: string;
+    dateTo?: string;
+    status?: DamageStatus;
+    customerId?: string;
+    severity?: DamageSeverity;
+    cause?: DamageCause;
+  }
+): Promise<void> {
+  const where = buildCsvWhere(filters);
+
+  // Write BOM + header
+  res.write('\uFEFF' + CSV_HEADERS.map((h) => `"${h}"`).join(',') + '\n');
+
+  let cursor: string | undefined;
+  let hasMore = true;
+
+  while (hasMore) {
+    const batch = await prisma.damageReport.findMany({
+      where,
+      include: {
+        customer: { select: { name: true, code: true } },
+        product: { select: { sku: true, name: true } },
+        reportedBy: { select: { username: true, firstName: true, lastName: true } },
+      },
+      orderBy: { dateReported: 'desc' },
+      take: CSV_BATCH_SIZE,
+      ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+    });
+
+    if (batch.length === 0) {
+      hasMore = false;
+      break;
+    }
+
+    const chunk = batch.map((report) => formatCsvRow(report)).join('\n') + '\n';
+    res.write(chunk);
+
+    cursor = batch[batch.length - 1].id;
+    hasMore = batch.length === CSV_BATCH_SIZE;
   }
 
-  return csvRows.join('\n');
+  res.end();
 }

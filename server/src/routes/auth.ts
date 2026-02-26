@@ -3,6 +3,7 @@ import { z } from 'zod';
 import rateLimit from 'express-rate-limit';
 import { validate } from '../middleware/validate';
 import { authenticate } from '../middleware/auth';
+import { refreshLimiter, strictLimiter } from '../middleware/rateLimiter';
 import * as authService from '../services/authService';
 import prisma from '../config/database';
 
@@ -95,7 +96,7 @@ router.post('/login', loginRateLimiter, validate(loginSchema), async (req: Reque
  *       401:
  *         description: No or invalid refresh token
  */
-router.post('/refresh', async (req: Request, res: Response) => {
+router.post('/refresh', refreshLimiter, async (req: Request, res: Response) => {
   const refreshToken = req.cookies[REFRESH_COOKIE_NAME] as string | undefined;
 
   if (!refreshToken) {
@@ -149,7 +150,7 @@ router.get('/me', authenticate, async (req: Request, res: Response) => {
   res.json({ data: user });
 });
 
-router.put('/change-password', authenticate, validate(changePasswordSchema), async (req: Request, res: Response) => {
+router.put('/change-password', authenticate, strictLimiter, validate(changePasswordSchema), async (req: Request, res: Response) => {
   const { currentPassword, newPassword } = req.body as {
     currentPassword: string;
     newPassword: string;

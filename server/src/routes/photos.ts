@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { validate } from '../middleware/validate';
 import { upload } from '../config/upload';
+import { uploadLimiter } from '../middleware/rateLimiter';
 import * as photoService from '../services/photoService';
 import { createAuditLog } from '../services/auditService';
 import { getClientIp } from '../utils/helpers';
@@ -14,6 +15,7 @@ const updateCaptionSchema = z.object({
 
 router.post(
   '/upload/:damageId',
+  uploadLimiter,
   upload.array('photos', 10),
   async (req: Request, res: Response) => {
     const files = req.files as Express.Multer.File[] | undefined;

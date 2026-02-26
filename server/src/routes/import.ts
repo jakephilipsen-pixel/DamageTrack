@@ -5,6 +5,7 @@ import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { Role } from '@prisma/client';
 import { requireAdmin, requireManagerOrAdmin } from '../middleware/roleCheck';
+import { uploadLimiter } from '../middleware/rateLimiter';
 import { createAuditLog } from '../services/auditService';
 import { getClientIp } from '../utils/helpers';
 import prisma from '../config/database';
@@ -97,7 +98,7 @@ const userImportSchema = z.object({
  *         description: Import result with created count and errors
  */
 // POST /api/import/customers
-router.post('/customers', requireManagerOrAdmin, csvUpload.single('file'), async (req: Request, res: Response) => {
+router.post('/customers', requireManagerOrAdmin, uploadLimiter, csvUpload.single('file'), async (req: Request, res: Response) => {
   if (!req.file) {
     res.status(400).json({ error: 'No file uploaded' });
     return;
@@ -182,7 +183,7 @@ router.post('/customers', requireManagerOrAdmin, csvUpload.single('file'), async
  *         description: Import result
  */
 // POST /api/import/products
-router.post('/products', requireManagerOrAdmin, csvUpload.single('file'), async (req: Request, res: Response) => {
+router.post('/products', requireManagerOrAdmin, uploadLimiter, csvUpload.single('file'), async (req: Request, res: Response) => {
   if (!req.file) {
     res.status(400).json({ error: 'No file uploaded' });
     return;
@@ -292,7 +293,7 @@ router.post('/products', requireManagerOrAdmin, csvUpload.single('file'), async 
  *         description: Import result
  */
 // POST /api/import/users
-router.post('/users', requireAdmin, csvUpload.single('file'), async (req: Request, res: Response) => {
+router.post('/users', requireAdmin, uploadLimiter, csvUpload.single('file'), async (req: Request, res: Response) => {
   if (!req.file) {
     res.status(400).json({ error: 'No file uploaded' });
     return;

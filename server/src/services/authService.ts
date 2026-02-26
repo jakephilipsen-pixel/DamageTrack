@@ -24,11 +24,13 @@ export function generateTokens(user: {
   id: string;
   username: string;
   role: Role;
+  tokenVersion?: number;
 }): TokenPair {
   const payload: Omit<JwtPayload, 'iat' | 'exp'> = {
     userId: user.id,
     username: user.username,
     role: user.role,
+    tokenVersion: user.tokenVersion ?? 0,
   };
 
   const accessToken = jwt.sign(payload, getJwtSecret(), {
@@ -70,7 +72,12 @@ export async function login(
     data: { lastLogin: new Date() },
   });
 
-  const tokens = generateTokens(user);
+  const tokens = generateTokens({
+    id: user.id,
+    username: user.username,
+    role: user.role,
+    tokenVersion: user.tokenVersion,
+  });
 
   return {
     user: {
@@ -106,7 +113,7 @@ export async function refreshTokens(refreshToken: string): Promise<TokenPair> {
 
   const user = await prisma.user.findUnique({
     where: { id: payload.userId },
-    select: { id: true, username: true, role: true, isActive: true },
+    select: { id: true, username: true, role: true, isActive: true, tokenVersion: true },
   });
 
   if (!user) {
@@ -115,6 +122,11 @@ export async function refreshTokens(refreshToken: string): Promise<TokenPair> {
 
   if (!user.isActive) {
     throw Object.assign(new Error('Account is deactivated'), { status: 401 });
+  }
+
+  // Reject refresh tokens issued before a tokenVersion bump (password reset, deactivation)
+  if (payload.tokenVersion !== undefined && payload.tokenVersion !== user.tokenVersion) {
+    throw Object.assign(new Error('Token has been revoked'), { status: 401 });
   }
 
   return generateTokens(user);
@@ -152,6 +164,7 @@ export async function changePassword(
     data: {
       password: hashedPassword,
       mustChangePassword: false,
+      tokenVersion: { increment: 1 },
     },
   });
 }
@@ -176,6 +189,7 @@ export async function resetPassword(
     data: {
       password: hashedPassword,
       mustChangePassword: true,
+      tokenVersion: { increment: 1 },
     },
   });
 }

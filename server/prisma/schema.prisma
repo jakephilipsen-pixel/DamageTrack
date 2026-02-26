@@ -56,6 +56,7 @@ model User {
   isActive      Boolean   @default(true)
   lastLogin     DateTime?
   mustChangePassword Boolean @default(false)
+  tokenVersion  Int       @default(0)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -149,6 +150,16 @@ model DamageReport {
   comments          DamageComment[]
   statusHistory     StatusHistory[]
   emailExports      EmailExport[]
+
+  @@index([customerId])
+  @@index([productId])
+  @@index([reportedById])
+  @@index([status])
+  @@index([isArchived])
+  @@index([dateOfDamage])
+  @@index([createdAt])
+  @@index([status, isArchived])
+  @@index([customerId, status])
 }
 
 model DamagePhoto {
@@ -209,6 +220,10 @@ model AuditLog {
   details     Json?
   ipAddress   String?
   createdAt   DateTime  @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([entity, entityId])
 }
 
 model SystemSetting {

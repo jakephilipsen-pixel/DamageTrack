@@ -48,7 +48,7 @@ export async function authenticate(
 
     const user = await prisma.user.findUnique({
       where: { id: payload.userId },
-      select: { id: true, username: true, role: true, isActive: true },
+      select: { id: true, username: true, role: true, isActive: true, tokenVersion: true },
     });
 
     if (!user) {
@@ -58,6 +58,12 @@ export async function authenticate(
 
     if (!user.isActive) {
       res.status(401).json({ error: 'Account is deactivated' });
+      return;
+    }
+
+    // Reject tokens issued before a password reset or deactivation
+    if (payload.tokenVersion !== undefined && payload.tokenVersion !== user.tokenVersion) {
+      res.status(401).json({ error: 'Token has been revoked' });
       return;
     }
 

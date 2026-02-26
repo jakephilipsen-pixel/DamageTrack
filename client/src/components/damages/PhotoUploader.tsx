@@ -88,7 +88,7 @@ export function PhotoUploader({ files, onChange, maxFiles = 10 }: PhotoUploaderP
       {files.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
           {files.map((file, index) => (
-            <div key={index} className="relative group rounded-lg overflow-hidden border bg-muted">
+            <div key={`${file.name}-${file.size}-${file.lastModified}`} className="relative group rounded-lg overflow-hidden border bg-muted">
               <img
                 src={URL.createObjectURL(file)}
                 alt={file.name}

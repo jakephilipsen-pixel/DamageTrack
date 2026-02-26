@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import { Role, Prisma } from '@prisma/client';
 import { validate } from '../middleware/validate';
 import { requireAdmin } from '../middleware/roleCheck';
+import { strictLimiter } from '../middleware/rateLimiter';
 import * as authService from '../services/authService';
 import { createAuditLog } from '../services/auditService';
 import { parsePaginationParams, getClientIp } from '../utils/helpers';
@@ -114,7 +115,7 @@ router.get('/', async (req: Request, res: Response) => {
   });
 });
 
-router.post('/', validate(createUserSchema), async (req: Request, res: Response) => {
+router.post('/', strictLimiter, validate(createUserSchema), async (req: Request, res: Response) => {
   const body = req.body as {
     email: string;
     username: string;
@@ -251,9 +252,14 @@ router.patch('/:id/toggle-active', async (req: Request, res: Response) => {
     return;
   }
 
+  const newIsActive = !existing.isActive;
   const updated = await prisma.user.update({
     where: { id: req.params.id },
-    data: { isActive: !existing.isActive },
+    data: {
+      isActive: newIsActive,
+      // Bump tokenVersion on deactivation to revoke all existing tokens
+      ...(!newIsActive ? { tokenVersion: { increment: 1 } } : {}),
+    },
     select: {
       id: true,
       username: true,
@@ -273,7 +279,7 @@ router.patch('/:id/toggle-active', async (req: Request, res: Response) => {
   res.json({ data: updated });
 });
 
-router.post('/:id/reset-password', validate(resetPasswordSchema), async (req: Request, res: Response) => {
+router.post('/:id/reset-password', strictLimiter, validate(resetPasswordSchema), async (req: Request, res: Response) => {
   const { newPassword } = req.body as { newPassword: string };
 
   await authService.resetPassword(req.params.id, newPassword);

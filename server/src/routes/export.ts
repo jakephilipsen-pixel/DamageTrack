@@ -5,7 +5,7 @@ import { validate } from '../middleware/validate';
 import { requireManagerOrAdmin } from '../middleware/roleCheck';
 import * as damageService from '../services/damageService';
 import { sendDamageReport } from '../services/emailService';
-import { generatePDF, generateCSV } from '../services/exportService';
+import { generatePDF, streamCSV } from '../services/exportService';
 import { createAuditLog } from '../services/auditService';
 import { getClientIp } from '../utils/helpers';
 import { format } from 'date-fns';
@@ -85,8 +85,6 @@ router.get('/csv', requireManagerOrAdmin, async (req: Request, res: Response) =>
   if (req.query.severity) filters.severity = req.query.severity as DamageSeverity;
   if (req.query.cause) filters.cause = req.query.cause as DamageCause;
 
-  const csv = await generateCSV(filters);
-
   const filename = `damage-reports-${format(new Date(), 'yyyyMMdd-HHmm')}.csv`;
 
   await createAuditLog({
@@ -100,7 +98,9 @@ router.get('/csv', requireManagerOrAdmin, async (req: Request, res: Response) =>
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
   res.setHeader('Cache-Control', 'no-cache');
-  res.send('\uFEFF' + csv);
+  res.setHeader('Transfer-Encoding', 'chunked');
+
+  await streamCSV(res, filters);
 });
 
 export default router;
