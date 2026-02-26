@@ -46,7 +46,7 @@ const logoUpload = multer({
 });
 
 function getBrandingResponse(settings: any) {
-  const appUrl = process.env.APP_URL || 'http://localhost:5174';
+  const appUrl = process.env.APP_URL || 'http://localhost:5173';
   return {
     companyName: settings.companyName,
     tagline: settings.tagline,

@@ -7,7 +7,8 @@ A professional 3PL warehouse damage logging and management system.
 - **Damage Report Management** — Create, track, and manage damage reports with full audit trail
 - **Photo Documentation** — Upload up to 10 photos per report with automatic thumbnail generation
 - **Multi-step Form** — Guided 5-step damage reporting workflow
-- **Status Workflow** — Track reports through: Draft → Reported → Under Review → Customer Notified → Claim Filed → Resolved/Written Off → Closed
+- **Status Workflow** — Track reports through: Open → Customer Notified → Destroy Stock/Rep Collect → Closed
+- **White-Label Branding** — Custom logo, company name, colours across login, sidebar, PDFs, and emails
 - **Email Export** — Send formatted HTML reports directly to customers/insurers
 - **PDF Export** — Generate professional PDF damage reports
 - **CSV Export** — Bulk export damage data for analysis
@@ -64,6 +65,13 @@ npm run dev
 Open http://localhost:5173
 
 **Default credentials:** `admin` / `DamageTrack2024!`
+
+### Production Reset
+
+To wipe transactional data and reset for a clean start (preserves customers, products, locations, branding):
+```bash
+cd server && npm run seed:production
+```
 
 ## Environment Variables
 
@@ -155,7 +163,21 @@ ssh nucserver 'docker exec -it damagetrack_server sh'
 | View audit log | — | — | ✓ |
 | Delete reports | — | — | ✓ |
 
+## Stress Testing
+
+See `stress-test/` for the load testing suite. Quick run:
+```bash
+cd stress-test && DURATION=5 AGENTS=3 BASE_URL=http://localhost:3002 npm test
+```
+
 ## API Endpoints
+
+### Branding (public)
+- `GET /api/branding` — Get branding settings (public, no auth)
+- `PUT /api/branding` — Update branding (ADMIN)
+- `POST /api/branding/logo` — Upload logo (ADMIN)
+- `GET /api/branding/logo` — Serve logo (public)
+- `DELETE /api/branding/logo` — Delete logo (ADMIN)
 
 ### Auth
 - `POST /api/auth/login` — Login
@@ -196,6 +218,7 @@ See `server/prisma/schema.prisma` for the full schema. Key models:
 - `DamageComment` — Comments/notes on reports
 - `StatusHistory` — Status change audit trail
 - `AuditLog` — System-wide audit log
+- `BrandingSettings` — White-label branding (singleton)
 
 ## File Storage
 

@@ -43,6 +43,11 @@ Thumbs.db
 # Prisma
 server/prisma/migrations/*.sql
 
+# Stress test results
+stress-test/report.html
+stress-test/report.json
+stress-test/results/
+
 # SSL certificates — never commit private keys
 nginx/certs/*.crt
 nginx/certs/*.key

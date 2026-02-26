@@ -1,0 +1,23 @@
+{
+  "name": "damagetrack-stress-test",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test": "npx tsx index.ts",
+    "test:quick": "DURATION=5 AGENTS=3 npx tsx index.ts",
+    "test:full": "npx tsx index.ts",
+    "cleanup": "npx tsx cleanup.ts",
+    "clean": "rm -f report.html report.json"
+  },
+  "dependencies": {
+    "@faker-js/faker": "^10.3.0",
+    "axios": "^1.13.5",
+    "form-data": "^4.0.5",
+    "sharp": "^0.34.5",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.1"
+  }
+}
