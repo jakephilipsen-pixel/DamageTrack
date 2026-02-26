@@ -1,5 +1,5 @@
 export type Role = 'ADMIN' | 'MANAGER' | 'WAREHOUSE_USER';
-export type DamageStatus = 'DRAFT' | 'REPORTED' | 'UNDER_REVIEW' | 'CUSTOMER_NOTIFIED' | 'CLAIM_FILED' | 'RESOLVED' | 'WRITTEN_OFF' | 'CLOSED';
+export type DamageStatus = 'OPEN' | 'CUSTOMER_NOTIFIED' | 'DESTROY_STOCK' | 'REP_COLLECT' | 'CLOSED';
 export type DamageSeverity = 'MINOR' | 'MODERATE' | 'MAJOR' | 'TOTAL_LOSS';
 export type DamageCause = 'FORKLIFT_IMPACT' | 'DROPPED_DURING_HANDLING' | 'WATER_DAMAGE' | 'CRUSH_DAMAGE' | 'PALLET_FAILURE' | 'TEMPERATURE_EXPOSURE' | 'INCORRECT_STACKING' | 'TRANSIT_DAMAGE_INBOUND' | 'TRANSIT_DAMAGE_OUTBOUND' | 'PEST_DAMAGE' | 'EXPIRED_PRODUCT' | 'PACKAGING_FAILURE' | 'UNKNOWN' | 'OTHER';
 
@@ -79,6 +79,19 @@ export interface StatusHistory {
   createdAt: string;
 }
 
+export interface WarehouseLocation {
+  id: string;
+  code: string;
+  zone?: string;
+  aisle?: string;
+  rack?: string;
+  shelf?: string;
+  description?: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface DamageReport {
   id: string;
   referenceNumber: string;
@@ -87,11 +100,12 @@ export interface DamageReport {
   productId: string;
   product: Product;
   quantity: number;
-  severity: DamageSeverity;
+  severity?: DamageSeverity;
   cause: DamageCause;
   causeOther?: string;
   description: string;
-  locationInWarehouse?: string;
+  warehouseLocationId?: string;
+  warehouseLocation?: Pick<WarehouseLocation, 'id' | 'code' | 'zone' | 'aisle' | 'rack' | 'shelf' | 'description'>;
   status: DamageStatus;
   estimatedLoss?: number;
   reportedById: string;
@@ -154,5 +168,4 @@ export interface DashboardStats {
   byCause: { cause: DamageCause; count: number }[];
   byCustomer: { customerName: string; count: number }[];
   recentDamages: DamageReport[];
-  totalOpenLoss: number;
 }

@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import { Role, Prisma } from '@prisma/client';
 import { validate } from '../middleware/validate';
 import { requireAdmin } from '../middleware/roleCheck';

@@ -4,7 +4,8 @@ import { Prisma } from '@prisma/client';
 import prisma from '../config/database';
 import { DamageStatus, DamageSeverity, DamageCause } from '@prisma/client';
 
-function formatLabel(str: string): string {
+function formatLabel(str: string | null | undefined): string {
+  if (!str) return '';
   return str
     .replace(/_/g, ' ')
     .toLowerCase()
@@ -48,41 +49,23 @@ export async function generatePDF(report: FullDamageReport): Promise<Buffer> {
 
     doc.moveDown(4);
 
-    const severityColors: Record<string, string> = {
-      MINOR: '#22c55e',
-      MODERATE: '#f59e0b',
-      MAJOR: '#ef4444',
-      TOTAL_LOSS: '#7f1d1d',
-    };
-
     const statusColors: Record<string, string> = {
-      DRAFT: '#6b7280',
-      REPORTED: '#3b82f6',
-      UNDER_REVIEW: '#f59e0b',
-      CUSTOMER_NOTIFIED: '#8b5cf6',
-      CLAIM_FILED: '#ef4444',
-      RESOLVED: '#22c55e',
-      WRITTEN_OFF: '#374151',
-      CLOSED: '#059669',
+      OPEN: '#3b82f6',
+      CUSTOMER_NOTIFIED: '#f59e0b',
+      DESTROY_STOCK: '#ef4444',
+      REP_COLLECT: '#8b5cf6',
+      CLOSED: '#22c55e',
     };
 
     const statusBadgeColor = statusColors[report.status] || '#6b7280';
-    const severityBadgeColor = severityColors[report.severity] || '#6b7280';
 
     const badgeY = doc.y;
     const badgeHeight = 22;
 
-    doc.roundedRect(60, badgeY, 140, badgeHeight, 4).fill(statusBadgeColor);
+    doc.roundedRect(60, badgeY, 180, badgeHeight, 4).fill(statusBadgeColor);
     doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(9)
       .text(`STATUS: ${formatLabel(report.status)}`, 60, badgeY + 7, {
-        width: 140,
-        align: 'center',
-      });
-
-    doc.roundedRect(215, badgeY, 140, badgeHeight, 4).fill(severityBadgeColor);
-    doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(9)
-      .text(`SEVERITY: ${formatLabel(report.severity)}`, 215, badgeY + 7, {
-        width: 140,
+        width: 180,
         align: 'center',
       });
 
@@ -142,12 +125,10 @@ export async function generatePDF(report: FullDamageReport): Promise<Buffer> {
     fieldRow('Date Reported', format(new Date(report.dateReported), 'dd MMM yyyy HH:mm'));
     fieldRow('Quantity Damaged', `${report.quantity} unit(s)`);
     fieldRow('Cause', formatLabel(report.cause) + (report.causeOther ? ` — ${report.causeOther}` : ''));
-    fieldRow('Location in Warehouse', report.locationInWarehouse || 'Not specified');
-
-    const lossValue = report.estimatedLoss !== null && report.estimatedLoss !== undefined
-      ? `$${Number(report.estimatedLoss).toFixed(2)}`
-      : 'Not estimated';
-    fieldRow('Estimated Loss', lossValue);
+    const locationLabel = report.warehouseLocation
+      ? `${report.warehouseLocation.code}${report.warehouseLocation.zone ? ` (${report.warehouseLocation.zone})` : ''}`
+      : 'Not specified';
+    fieldRow('Location in Warehouse', locationLabel);
 
     const reporterName = report.reportedBy
       ? `${report.reportedBy.firstName} ${report.reportedBy.lastName} (${report.reportedBy.username})`

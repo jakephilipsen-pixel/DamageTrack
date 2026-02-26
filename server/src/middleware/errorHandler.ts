@@ -7,11 +7,14 @@ export function errorHandler(
   res: Response,
   _next: NextFunction
 ): void {
-  logger.error('Unhandled error', {
+  const status = err.status || err.statusCode || 500;
+  const logFn = status < 500 ? logger.warn.bind(logger) : logger.error.bind(logger);
+  logFn('Request error', {
     error: err.message,
-    stack: err.stack,
+    status,
     path: req.path,
     method: req.method,
+    ...(status >= 500 && { stack: err.stack }),
   });
 
   if (err.name === 'MulterError') {
@@ -38,9 +41,7 @@ export function errorHandler(
     return;
   }
 
-  const status = err.status || err.statusCode || 500;
-  const message =
-    status < 500 ? err.message : 'Internal server error';
+  const message = status < 500 ? err.message : 'Internal server error';
 
   res.status(status).json({ error: message });
 }

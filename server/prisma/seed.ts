@@ -1,5 +1,5 @@
-import { PrismaClient, Role, DamageStatus, DamageSeverity, DamageCause } from '@prisma/client';
-import bcrypt from 'bcrypt';
+import { PrismaClient, Role, DamageStatus, DamageSeverity, DamageCause, WarehouseLocation } from '@prisma/client';
+import bcrypt from 'bcryptjs';
 import { subDays, subHours, subMonths } from 'date-fns';
 
 const prisma = new PrismaClient();
@@ -16,6 +16,7 @@ async function main() {
   await prisma.product.deleteMany();
   await prisma.customer.deleteMany();
   await prisma.user.deleteMany();
+  await prisma.warehouseLocation.deleteMany();
   await prisma.systemSetting.deleteMany();
 
   console.log('Creating users...');
@@ -294,23 +295,60 @@ async function main() {
     },
   });
 
+  console.log('Creating warehouse locations...');
+
+  const locationsData = [
+    { code: 'AISLE-A-BAY1', zone: 'Aisle A', aisle: 'Bay 1-3', description: 'Level 1 — general storage' },
+    { code: 'AISLE-B-BAY5', zone: 'Aisle B', aisle: 'Bay 5', description: 'Level 3 — small goods' },
+    { code: 'AISLE-B-BAY12', zone: 'Aisle B', aisle: 'Bay 12', rack: 'Level 2' },
+    { code: 'AISLE-D-BAY3', zone: 'Aisle D', aisle: 'Bay 3', description: 'Level 1' },
+    { code: 'AISLE-F-BAY7', zone: 'Aisle F', aisle: 'Bay 7', description: 'Level 1' },
+    { code: 'COLD-A-CS2', zone: 'Cold Storage A', aisle: 'Section CS-2' },
+    { code: 'DOCK-1', zone: 'Receiving Dock 1', description: 'Inbound receiving area' },
+    { code: 'DOCK-2-STAGE', zone: 'Receiving Dock 2', description: 'Staging Area' },
+    { code: 'DOCK-3-TEST', zone: 'Loading Dock 3', description: 'Testing Station' },
+    { code: 'HAZ-H5', zone: 'Hazmat Storage', aisle: 'Row H-5' },
+    { code: 'HAZ-H9', zone: 'Hazmat Storage', aisle: 'Row H-9' },
+    { code: 'HM-SECT2', zone: 'Heavy Materials Bay', description: 'Section HM-2' },
+    { code: 'HVAULT-1', zone: 'High-Value Storage', description: 'Cage HV-1' },
+    { code: 'HVAULT-3', zone: 'High-Value Storage', description: 'Cage HV-3' },
+    { code: 'IT-SHELF-R4', zone: 'IT Storage Room', rack: 'Shelf R-4' },
+    { code: 'IT-SHELF-R6', zone: 'IT Storage Room', rack: 'Shelf R-6' },
+    { code: 'MEZ-M3', zone: 'Mezzanine Level', description: 'Section M-3' },
+    { code: 'OVFL-BAY11', zone: 'Overflow Storage', description: 'Bay OV-11' },
+    { code: 'SECT-C-BAY8', zone: 'Section C', aisle: 'Bay 8', description: 'Level 1' },
+  ];
+
+  const createdLocations: Record<string, WarehouseLocation> = {};
+  for (const loc of locationsData) {
+    const created = await prisma.warehouseLocation.create({ data: loc });
+    createdLocations[created.code] = created;
+  }
+
   console.log('Creating damage reports...');
 
   const now = new Date();
 
   const reporters = [admin, manager1, manager2, warehouse1, warehouse2, warehouse3];
-  const reviewers = [manager1, manager2, admin];
+
+  // Old status → new status mapping:
+  // DRAFT, REPORTED → OPEN
+  // UNDER_REVIEW → CUSTOMER_NOTIFIED
+  // CUSTOMER_NOTIFIED → CUSTOMER_NOTIFIED
+  // CLAIM_FILED → DESTROY_STOCK
+  // RESOLVED → CLOSED
+  // WRITTEN_OFF → CLOSED
 
   interface DamageData {
     referenceNumber: string;
     customerId: string;
     productId: string;
     quantity: number;
-    severity: DamageSeverity;
+    severity: DamageSeverity | null;
     cause: DamageCause;
     causeOther: string | null;
     description: string;
-    locationInWarehouse: string;
+    warehouseLocationId: string | null;
     status: DamageStatus;
     estimatedLoss: number;
     reportedById: string;
@@ -330,8 +368,8 @@ async function main() {
       cause: DamageCause.FORKLIFT_IMPACT,
       causeOther: null,
       description: 'Forklift operator clipped the corner of pallet stack B-12 while reversing. Approximately 12 units of Super Widget Pro sustained crush damage to packaging and product casing.',
-      locationInWarehouse: 'Aisle B, Bay 12, Level 2',
-      status: DamageStatus.RESOLVED,
+      warehouseLocationId: createdLocations['AISLE-B-BAY12'].id,
+      status: DamageStatus.CLOSED,
       estimatedLoss: 1799.88,
       reportedById: warehouse1.id,
       reviewedById: manager1.id,
@@ -348,8 +386,8 @@ async function main() {
       cause: DamageCause.DROPPED_DURING_HANDLING,
       causeOther: null,
       description: 'Arc Reactor Core prototype dropped from mezzanine level during transfer operation. Unit fell approximately 4.5 meters, resulting in catastrophic structural failure. Unit is non-recoverable.',
-      locationInWarehouse: 'Mezzanine Level, Section M-3',
-      status: DamageStatus.CLAIM_FILED,
+      warehouseLocationId: createdLocations['MEZ-M3'].id,
+      status: DamageStatus.DESTROY_STOCK,
       estimatedLoss: 25000.0,
       reportedById: warehouse2.id,
       reviewedById: manager2.id,
@@ -366,7 +404,7 @@ async function main() {
       cause: DamageCause.PALLET_FAILURE,
       causeOther: null,
       description: 'Wooden pallet failed under load causing 3 industrial solvent tanks to tip and roll. Two tanks are dented and one sustained a seam crack. Contents were contained but units are compromised.',
-      locationInWarehouse: 'Hazmat Storage, Row H-5',
+      warehouseLocationId: createdLocations['HAZ-H5'].id,
       status: DamageStatus.CUSTOMER_NOTIFIED,
       estimatedLoss: 960.0,
       reportedById: warehouse3.id,
@@ -384,8 +422,8 @@ async function main() {
       cause: DamageCause.WATER_DAMAGE,
       causeOther: null,
       description: 'Roof leak above storage area C-8 during heavy rainfall. Two Advanced Power Cell units exposed to water intrusion overnight. Cells show signs of electrolyte seepage and are deemed unsafe for use.',
-      locationInWarehouse: 'Section C, Bay 8, Level 1',
-      status: DamageStatus.CLAIM_FILED,
+      warehouseLocationId: createdLocations['SECT-C-BAY8'].id,
+      status: DamageStatus.DESTROY_STOCK,
       estimatedLoss: 17500.0,
       reportedById: warehouse1.id,
       reviewedById: admin.id,
@@ -402,8 +440,8 @@ async function main() {
       cause: DamageCause.CRUSH_DAMAGE,
       causeOther: null,
       description: 'Rack mount server unit crushed when overloaded shelving unit collapsed. Unit sustained significant board-level damage. Hard drives may be recoverable but chassis and motherboard are total loss.',
-      locationInWarehouse: 'IT Storage Room, Shelf R-4',
-      status: DamageStatus.UNDER_REVIEW,
+      warehouseLocationId: createdLocations['IT-SHELF-R4'].id,
+      status: DamageStatus.CUSTOMER_NOTIFIED,
       estimatedLoss: 4500.0,
       reportedById: warehouse2.id,
       reviewedById: manager2.id,
@@ -420,8 +458,8 @@ async function main() {
       cause: DamageCause.INCORRECT_STACKING,
       causeOther: null,
       description: 'Six pairs of Rocket Skates stacked beyond maximum recommended height. Lower boxes deformed under weight causing product damage to units in bottom three boxes. Packaging failure with product scuffing.',
-      locationInWarehouse: 'Aisle D, Bay 3, Level 1',
-      status: DamageStatus.REPORTED,
+      warehouseLocationId: createdLocations['AISLE-D-BAY3'].id,
+      status: DamageStatus.OPEN,
       estimatedLoss: 2994.0,
       reportedById: warehouse3.id,
       reviewedById: null,
@@ -438,7 +476,7 @@ async function main() {
       cause: DamageCause.TRANSIT_DAMAGE_INBOUND,
       causeOther: null,
       description: 'Titanium alloy plating sheets arrived with corner dents and surface scratches from transit. Carrier packaging was insufficient for the load. 15 sheets have cosmetic damage but may be usable pending customer approval.',
-      locationInWarehouse: 'Receiving Dock 2, Staging Area',
+      warehouseLocationId: createdLocations['DOCK-2-STAGE'].id,
       status: DamageStatus.CUSTOMER_NOTIFIED,
       estimatedLoss: 2925.0,
       reportedById: warehouse1.id,
@@ -456,8 +494,8 @@ async function main() {
       cause: DamageCause.TEMPERATURE_EXPOSURE,
       causeOther: null,
       description: 'Temperature monitoring system failure in cold storage section caused capacitor arrays to be exposed to temperatures exceeding 40°C for approximately 8 hours. Electrolytic components likely degraded.',
-      locationInWarehouse: 'Cold Storage A, Section CS-2',
-      status: DamageStatus.UNDER_REVIEW,
+      warehouseLocationId: createdLocations['COLD-A-CS2'].id,
+      status: DamageStatus.CUSTOMER_NOTIFIED,
       estimatedLoss: 2500.0,
       reportedById: manager2.id,
       reviewedById: manager2.id,
@@ -474,8 +512,8 @@ async function main() {
       cause: DamageCause.PACKAGING_FAILURE,
       causeOther: null,
       description: 'Encrypted communications module arrived with tampered-looking packaging. Inner protective foam had shifted and unit shows minor cosmetic scratching on casing. Functional testing required before acceptance.',
-      locationInWarehouse: 'High-Value Storage, Cage HV-1',
-      status: DamageStatus.REPORTED,
+      warehouseLocationId: createdLocations['HVAULT-1'].id,
+      status: DamageStatus.OPEN,
       estimatedLoss: 320.0,
       reportedById: warehouse2.id,
       reviewedById: null,
@@ -492,8 +530,8 @@ async function main() {
       cause: DamageCause.FORKLIFT_IMPACT,
       causeOther: null,
       description: 'Forklift forks punctured through the base of a pallet of ergonomic office chairs during retrieval. Eight boxes sustained puncture and tear damage to packaging. Chair bases on bottom units are scratched.',
-      locationInWarehouse: 'Aisle F, Bay 7, Level 1',
-      status: DamageStatus.RESOLVED,
+      warehouseLocationId: createdLocations['AISLE-F-BAY7'].id,
+      status: DamageStatus.CLOSED,
       estimatedLoss: 551.0,
       reportedById: warehouse3.id,
       reviewedById: manager1.id,
@@ -510,8 +548,8 @@ async function main() {
       cause: DamageCause.WATER_DAMAGE,
       causeOther: null,
       description: 'Sprinkler system activated due to false alarm in Section A. Approximately 20 Portable Hole Kit units stored on bottom shelf were soaked. Product material is water-sensitive and all units are considered damaged.',
-      locationInWarehouse: 'Aisle A, Bay 1-3, Level 1',
-      status: DamageStatus.WRITTEN_OFF,
+      warehouseLocationId: createdLocations['AISLE-A-BAY1'].id,
+      status: DamageStatus.CLOSED,
       estimatedLoss: 1799.0,
       reportedById: warehouse1.id,
       reviewedById: admin.id,
@@ -528,8 +566,8 @@ async function main() {
       cause: DamageCause.DROPPED_DURING_HANDLING,
       causeOther: null,
       description: 'Repulsor engine assembly dropped during manual unloading. Unit slipped from hand truck due to inadequate securing straps. Nozzle assembly is fractured and housing shows dents. Likely non-functional.',
-      locationInWarehouse: 'Receiving Dock 1',
-      status: DamageStatus.UNDER_REVIEW,
+      warehouseLocationId: createdLocations['DOCK-1'].id,
+      status: DamageStatus.CUSTOMER_NOTIFIED,
       estimatedLoss: 15500.0,
       reportedById: warehouse2.id,
       reviewedById: manager2.id,
@@ -546,8 +584,8 @@ async function main() {
       cause: DamageCause.PEST_DAMAGE,
       causeOther: null,
       description: 'Rodent activity discovered near pallet stack in section H. One industrial solvent tank has gnaw marks on the outer label and protective wrapping. Tank integrity appears intact but requires inspection.',
-      locationInWarehouse: 'Hazmat Storage, Row H-9',
-      status: DamageStatus.REPORTED,
+      warehouseLocationId: createdLocations['HAZ-H9'].id,
+      status: DamageStatus.OPEN,
       estimatedLoss: 320.0,
       reportedById: warehouse3.id,
       reviewedById: null,
@@ -564,8 +602,8 @@ async function main() {
       cause: DamageCause.TRANSIT_DAMAGE_OUTBOUND,
       causeOther: null,
       description: 'Customer reported receiving advanced power cell with visible transit damage. External shipping data confirms unit left warehouse undamaged but arrived with dented casing. Investigating carrier liability.',
-      locationInWarehouse: 'N/A - In Transit',
-      status: DamageStatus.CUSTOMER_NOTIFIED,
+      warehouseLocationId: null,
+      status: DamageStatus.REP_COLLECT,
       estimatedLoss: 8750.0,
       reportedById: manager1.id,
       reviewedById: manager1.id,
@@ -582,8 +620,8 @@ async function main() {
       cause: DamageCause.UNKNOWN,
       causeOther: null,
       description: 'Two rack mount server units found with cracked front bezels during routine inventory check. No incident was reported. Investigating CCTV footage to determine cause. Damage appears to be impact-related.',
-      locationInWarehouse: 'IT Storage Room, Shelf R-6',
-      status: DamageStatus.UNDER_REVIEW,
+      warehouseLocationId: createdLocations['IT-SHELF-R6'].id,
+      status: DamageStatus.CUSTOMER_NOTIFIED,
       estimatedLoss: 900.0,
       reportedById: manager2.id,
       reviewedById: manager2.id,
@@ -600,8 +638,8 @@ async function main() {
       cause: DamageCause.PACKAGING_FAILURE,
       causeOther: null,
       description: 'Four Super Widget Pro units found with compromised packaging. Shrink wrap failed allowing units to shift. Products show minor scratches but appear functional. Customer approval needed before release.',
-      locationInWarehouse: 'Aisle B, Bay 5, Level 3',
-      status: DamageStatus.DRAFT,
+      warehouseLocationId: createdLocations['AISLE-B-BAY5'].id,
+      status: DamageStatus.OPEN,
       estimatedLoss: 599.96,
       reportedById: warehouse1.id,
       reviewedById: null,
@@ -618,8 +656,8 @@ async function main() {
       cause: DamageCause.INCORRECT_STACKING,
       causeOther: null,
       description: 'Titanium alloy plating sheets were stored vertically instead of horizontally per handling guidelines. Five sheets developed warping due to gravity stress over time. Sheets exceed flatness tolerance.',
-      locationInWarehouse: 'Heavy Materials Bay, Section HM-2',
-      status: DamageStatus.REPORTED,
+      warehouseLocationId: createdLocations['HM-SECT2'].id,
+      status: DamageStatus.OPEN,
       estimatedLoss: 3900.0,
       reportedById: warehouse3.id,
       reviewedById: null,
@@ -636,8 +674,8 @@ async function main() {
       cause: DamageCause.OTHER,
       causeOther: 'Electrical surge during loading dock power restoration',
       description: 'Power was restored to loading dock after maintenance and an electrical surge propagated through the dock equipment. One high-voltage capacitor array connected to testing equipment received the surge and is completely destroyed.',
-      locationInWarehouse: 'Loading Dock 3, Testing Station',
-      status: DamageStatus.REPORTED,
+      warehouseLocationId: createdLocations['DOCK-3-TEST'].id,
+      status: DamageStatus.OPEN,
       estimatedLoss: 1250.0,
       reportedById: warehouse2.id,
       reviewedById: null,
@@ -654,8 +692,8 @@ async function main() {
       cause: DamageCause.FORKLIFT_IMPACT,
       causeOther: null,
       description: 'New forklift operator misjudged clearance in high-value storage cage and impacted shelving unit. Three encrypted communications modules fell to the floor from shelf height. All units require inspection.',
-      locationInWarehouse: 'High-Value Storage, Cage HV-3',
-      status: DamageStatus.DRAFT,
+      warehouseLocationId: createdLocations['HVAULT-3'].id,
+      status: DamageStatus.OPEN,
       estimatedLoss: 9600.0,
       reportedById: warehouse1.id,
       reviewedById: null,
@@ -672,8 +710,8 @@ async function main() {
       cause: DamageCause.EXPIRED_PRODUCT,
       causeOther: null,
       description: 'Three ergonomic office chairs from an old shipment found to have foam degradation beyond acceptable limits. Chairs were stored for over 36 months and foam cushioning has hardened and cracked.',
-      locationInWarehouse: 'Overflow Storage, Bay OV-11',
-      status: DamageStatus.DRAFT,
+      warehouseLocationId: createdLocations['OVFL-BAY11'].id,
+      status: DamageStatus.OPEN,
       estimatedLoss: 826.5,
       reportedById: warehouse3.id,
       reviewedById: null,
@@ -700,20 +738,17 @@ async function main() {
   console.log('Creating status history...');
 
   const statusProgressions: Record<string, DamageStatus[]> = {
-    DRAFT: [DamageStatus.DRAFT],
-    REPORTED: [DamageStatus.DRAFT, DamageStatus.REPORTED],
-    UNDER_REVIEW: [DamageStatus.DRAFT, DamageStatus.REPORTED, DamageStatus.UNDER_REVIEW],
-    CUSTOMER_NOTIFIED: [DamageStatus.DRAFT, DamageStatus.REPORTED, DamageStatus.UNDER_REVIEW, DamageStatus.CUSTOMER_NOTIFIED],
-    CLAIM_FILED: [DamageStatus.DRAFT, DamageStatus.REPORTED, DamageStatus.UNDER_REVIEW, DamageStatus.CUSTOMER_NOTIFIED, DamageStatus.CLAIM_FILED],
-    RESOLVED: [DamageStatus.DRAFT, DamageStatus.REPORTED, DamageStatus.UNDER_REVIEW, DamageStatus.CUSTOMER_NOTIFIED, DamageStatus.RESOLVED],
-    WRITTEN_OFF: [DamageStatus.DRAFT, DamageStatus.REPORTED, DamageStatus.UNDER_REVIEW, DamageStatus.WRITTEN_OFF],
-    CLOSED: [DamageStatus.DRAFT, DamageStatus.REPORTED, DamageStatus.UNDER_REVIEW, DamageStatus.RESOLVED, DamageStatus.CLOSED],
+    OPEN: [DamageStatus.OPEN],
+    CUSTOMER_NOTIFIED: [DamageStatus.OPEN, DamageStatus.CUSTOMER_NOTIFIED],
+    DESTROY_STOCK: [DamageStatus.OPEN, DamageStatus.CUSTOMER_NOTIFIED, DamageStatus.DESTROY_STOCK],
+    REP_COLLECT: [DamageStatus.OPEN, DamageStatus.CUSTOMER_NOTIFIED, DamageStatus.REP_COLLECT],
+    CLOSED: [DamageStatus.OPEN, DamageStatus.CUSTOMER_NOTIFIED, DamageStatus.DESTROY_STOCK, DamageStatus.CLOSED],
   };
 
   for (let i = 0; i < createdReports.length; i++) {
     const report = createdReports[i];
     const damageInfo = damageData[i];
-    const progression = statusProgressions[report.status] || [DamageStatus.DRAFT];
+    const progression = statusProgressions[report.status] || [DamageStatus.OPEN];
 
     for (let j = 0; j < progression.length; j++) {
       const status = progression[j];
@@ -785,6 +820,7 @@ async function main() {
   console.log(`  - 6 users (1 admin, 2 managers, 3 warehouse)`);
   console.log(`  - 5 customers`);
   console.log(`  - 12 products`);
+  console.log(`  - 19 warehouse locations`);
   console.log(`  - 20 damage reports`);
   console.log(`  - Status histories and comments`);
   console.log(`  - 8 system settings`);
@@ -799,13 +835,10 @@ async function main() {
 
 function getStatusNote(status: DamageStatus): string {
   const notes: Record<DamageStatus, string> = {
-    DRAFT: 'Report saved as draft',
-    REPORTED: 'Report submitted for review',
-    UNDER_REVIEW: 'Report is under review by management',
+    OPEN: 'Report created',
     CUSTOMER_NOTIFIED: 'Customer has been notified of the damage',
-    CLAIM_FILED: 'Insurance/liability claim has been filed',
-    RESOLVED: 'Issue resolved with customer',
-    WRITTEN_OFF: 'Damage written off as operational loss',
+    DESTROY_STOCK: 'Stock marked for destruction',
+    REP_COLLECT: 'Rep/customer to collect stock',
     CLOSED: 'Report closed, all actions completed',
   };
   return notes[status] || 'Status updated';

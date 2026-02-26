@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { Calendar, User, MapPin } from 'lucide-react';
 import { Card, CardContent } from '../ui/card';
-import { StatusBadge, SeverityBadge } from './StatusBadge';
+import { StatusBadge } from './StatusBadge';
 import { DamageReport } from '../../types';
 import { formatDate, CAUSE_LABELS } from '../../utils/formatters';
 
@@ -25,7 +25,6 @@ export function DamageCard({ damage }: DamageCardProps) {
           </div>
           <div className="flex flex-col items-end gap-1">
             <StatusBadge status={damage.status} />
-            <SeverityBadge severity={damage.severity} />
           </div>
         </div>
 
@@ -47,10 +46,10 @@ export function DamageCard({ damage }: DamageCardProps) {
             <User className="h-3 w-3" />
             {damage.reportedBy?.firstName} {damage.reportedBy?.lastName}
           </div>
-          {damage.locationInWarehouse && (
+          {damage.warehouseLocation && (
             <div className="flex items-center gap-1">
               <MapPin className="h-3 w-3" />
-              <span className="truncate max-w-20">{damage.locationInWarehouse}</span>
+              <span className="truncate max-w-20">{damage.warehouseLocation.code}</span>
             </div>
           )}
         </div>

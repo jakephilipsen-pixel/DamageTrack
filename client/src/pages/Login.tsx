@@ -75,7 +75,6 @@ export default function Login() {
       toast.success('Password changed successfully.');
       setShowChangePassword(false);
       resetPwd();
-      navigate('/dashboard');
     } catch (err: any) {
       const detail = err.response?.data?.details?.[0]?.message;
       toast.error(detail || err.response?.data?.error || 'Failed to change password');

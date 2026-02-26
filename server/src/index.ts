@@ -25,6 +25,7 @@ import exportRoutes from './routes/export';
 import adminRoutes from './routes/admin';
 import importRoutes from './routes/import';
 import notificationRoutes from './routes/notifications';
+import warehouseLocationRoutes from './routes/warehouseLocations';
 
 const app = express();
 const PORT = process.env.APP_PORT || 3001;
@@ -93,6 +94,7 @@ app.use('/api/export', authenticate, exportRoutes);
 app.use('/api/admin', authenticate, adminRoutes);
 app.use('/api/import', authenticate, importRoutes);
 app.use('/api/notifications', authenticate, notificationRoutes);
+app.use('/api/warehouse-locations', authenticate, warehouseLocationRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

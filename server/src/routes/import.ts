@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import { parse } from 'csv-parse';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { Role } from '@prisma/client';
 import { requireAdmin, requireManagerOrAdmin } from '../middleware/roleCheck';

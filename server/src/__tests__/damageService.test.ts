@@ -17,35 +17,37 @@ vi.mock('../config/database', () => ({
 import prisma from '../config/database';
 import { changeStatus } from '../services/damageService';
 
+const mockUpdateResult = (status: string) => ({
+  id: '1',
+  status,
+  referenceNumber: 'REF-001',
+  estimatedLoss: null,
+  customer: {},
+  product: {},
+  reportedBy: {},
+  reviewedBy: null,
+  photos: [],
+  comments: [],
+  statusHistory: [],
+  _count: { photos: 0, comments: 0 },
+});
+
 describe('changeStatus', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('allows DRAFT → REPORTED transition', async () => {
-    (prisma.damageReport.findUnique as any).mockResolvedValueOnce({ id: '1', status: 'DRAFT' });
+  it('allows OPEN → CUSTOMER_NOTIFIED transition', async () => {
+    (prisma.damageReport.findUnique as any).mockResolvedValueOnce({ id: '1', status: 'OPEN' });
     (prisma.user.findUnique as any).mockResolvedValueOnce({ firstName: 'A', lastName: 'B' });
-    (prisma.damageReport.update as any).mockResolvedValueOnce({
-      id: '1',
-      status: 'REPORTED',
-      referenceNumber: 'REF-001',
-      estimatedLoss: null,
-      customer: {},
-      product: {},
-      reportedBy: {},
-      reviewedBy: null,
-      photos: [],
-      comments: [],
-      statusHistory: [],
-      _count: { photos: 0, comments: 0 },
-    });
+    (prisma.damageReport.update as any).mockResolvedValueOnce(mockUpdateResult('CUSTOMER_NOTIFIED'));
 
-    const result = await changeStatus('1', DamageStatus.REPORTED, 'user1');
-    expect(result.status).toBe('REPORTED');
+    const result = await changeStatus('1', DamageStatus.CUSTOMER_NOTIFIED, 'user1');
+    expect(result.status).toBe('CUSTOMER_NOTIFIED');
   });
 
-  it('rejects invalid transition DRAFT → CLOSED with 400', async () => {
-    (prisma.damageReport.findUnique as any).mockResolvedValueOnce({ id: '1', status: 'DRAFT' });
+  it('rejects invalid transition OPEN → CLOSED with 400', async () => {
+    (prisma.damageReport.findUnique as any).mockResolvedValueOnce({ id: '1', status: 'OPEN' });
 
     await expect(changeStatus('1', DamageStatus.CLOSED, 'user1')).rejects.toMatchObject({
       status: 400,
@@ -56,37 +58,51 @@ describe('changeStatus', () => {
   it('rejects CLOSED → any transition with 400', async () => {
     (prisma.damageReport.findUnique as any).mockResolvedValueOnce({ id: '1', status: 'CLOSED' });
 
-    await expect(changeStatus('1', DamageStatus.RESOLVED, 'user1')).rejects.toMatchObject({
+    await expect(changeStatus('1', DamageStatus.CUSTOMER_NOTIFIED, 'user1')).rejects.toMatchObject({
       status: 400,
     });
   });
 
-  it('allows RESOLVED → CLOSED transition', async () => {
-    (prisma.damageReport.findUnique as any).mockResolvedValueOnce({ id: '1', status: 'RESOLVED' });
+  it('allows DESTROY_STOCK → CLOSED transition', async () => {
+    (prisma.damageReport.findUnique as any).mockResolvedValueOnce({ id: '1', status: 'DESTROY_STOCK' });
     (prisma.user.findUnique as any).mockResolvedValueOnce({ firstName: 'A', lastName: 'B' });
-    (prisma.damageReport.update as any).mockResolvedValueOnce({
-      id: '1',
-      status: 'CLOSED',
-      referenceNumber: 'REF-001',
-      estimatedLoss: null,
-      customer: {},
-      product: {},
-      reportedBy: {},
-      reviewedBy: null,
-      photos: [],
-      comments: [],
-      statusHistory: [],
-      _count: { photos: 0, comments: 0 },
-    });
+    (prisma.damageReport.update as any).mockResolvedValueOnce(mockUpdateResult('CLOSED'));
 
     const result = await changeStatus('1', DamageStatus.CLOSED, 'user1');
     expect(result.status).toBe('CLOSED');
   });
 
+  it('allows REP_COLLECT → CLOSED transition', async () => {
+    (prisma.damageReport.findUnique as any).mockResolvedValueOnce({ id: '1', status: 'REP_COLLECT' });
+    (prisma.user.findUnique as any).mockResolvedValueOnce({ firstName: 'A', lastName: 'B' });
+    (prisma.damageReport.update as any).mockResolvedValueOnce(mockUpdateResult('CLOSED'));
+
+    const result = await changeStatus('1', DamageStatus.CLOSED, 'user1');
+    expect(result.status).toBe('CLOSED');
+  });
+
+  it('allows CUSTOMER_NOTIFIED → DESTROY_STOCK transition', async () => {
+    (prisma.damageReport.findUnique as any).mockResolvedValueOnce({ id: '1', status: 'CUSTOMER_NOTIFIED' });
+    (prisma.user.findUnique as any).mockResolvedValueOnce({ firstName: 'A', lastName: 'B' });
+    (prisma.damageReport.update as any).mockResolvedValueOnce(mockUpdateResult('DESTROY_STOCK'));
+
+    const result = await changeStatus('1', DamageStatus.DESTROY_STOCK, 'user1');
+    expect(result.status).toBe('DESTROY_STOCK');
+  });
+
+  it('allows CUSTOMER_NOTIFIED → REP_COLLECT transition', async () => {
+    (prisma.damageReport.findUnique as any).mockResolvedValueOnce({ id: '1', status: 'CUSTOMER_NOTIFIED' });
+    (prisma.user.findUnique as any).mockResolvedValueOnce({ firstName: 'A', lastName: 'B' });
+    (prisma.damageReport.update as any).mockResolvedValueOnce(mockUpdateResult('REP_COLLECT'));
+
+    const result = await changeStatus('1', DamageStatus.REP_COLLECT, 'user1');
+    expect(result.status).toBe('REP_COLLECT');
+  });
+
   it('returns 404 when damage not found', async () => {
     (prisma.damageReport.findUnique as any).mockResolvedValueOnce(null);
 
-    await expect(changeStatus('nonexistent', DamageStatus.REPORTED, 'user1')).rejects.toMatchObject({
+    await expect(changeStatus('nonexistent', DamageStatus.CUSTOMER_NOTIFIED, 'user1')).rejects.toMatchObject({
       status: 404,
     });
   });

@@ -11,6 +11,7 @@ import {
   Settings,
   LogOut,
   Warehouse,
+  MapPin,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '../../hooks/useAuth';
@@ -38,6 +39,7 @@ const navItems = [
 
 const adminItems = [
   { to: '/admin/users', icon: Users, label: 'Users', roles: ['ADMIN'] },
+  { to: '/admin/warehouse-locations', icon: MapPin, label: 'Locations', roles: ['ADMIN'] },
   { to: '/admin/settings', icon: Settings, label: 'Settings', roles: ['ADMIN'] },
 ];
 

@@ -63,7 +63,7 @@ router.get('/dashboard-stats', async (_req: Request, res: Response) => {
     prisma.damageReport.aggregate({
       where: {
         status: {
-          notIn: [DamageStatus.RESOLVED, DamageStatus.CLOSED, DamageStatus.WRITTEN_OFF],
+          notIn: [DamageStatus.CLOSED],
         },
       },
       _sum: { estimatedLoss: true },

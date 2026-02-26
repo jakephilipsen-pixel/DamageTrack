@@ -6,10 +6,10 @@ import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { DamageStats } from '../components/reports/DamageStats';
 import { DamageChart } from '../components/reports/DamageChart';
-import { StatusBadge, SeverityBadge } from '../components/damages/StatusBadge';
+import { StatusBadge } from '../components/damages/StatusBadge';
 import { Skeleton } from '../components/ui/skeleton';
 import { getDashboardStats } from '../api/reports';
-import { CAUSE_LABELS, STATUS_LABELS, formatDate, formatCurrency } from '../utils/formatters';
+import { CAUSE_LABELS, STATUS_LABELS, formatDate } from '../utils/formatters';
 import { DamageCause, DamageStatus } from '../types';
 
 export default function Dashboard() {
@@ -138,7 +138,6 @@ export default function Dashboard() {
                           {damage.referenceNumber}
                         </span>
                         <StatusBadge status={damage.status} />
-                        <SeverityBadge severity={damage.severity} />
                       </div>
                       <p className="text-sm text-muted-foreground truncate mt-0.5">
                         {damage.customer?.name} — {damage.product?.name} ({damage.quantity} units)
@@ -147,11 +146,6 @@ export default function Dashboard() {
                   </div>
                   <div className="text-right shrink-0">
                     <p className="text-xs text-muted-foreground">{formatDate(damage.dateOfDamage)}</p>
-                    {damage.estimatedLoss != null && (
-                      <p className="text-xs font-medium text-red-600 mt-0.5">
-                        {formatCurrency(damage.estimatedLoss)}
-                      </p>
-                    )}
                   </div>
                 </div>
               ))}

@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Mail, FileDown, Send, Clock, MessageSquare, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Mail, FileDown, Send, Clock, MessageSquare } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Textarea } from '../ui/textarea';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
-import { StatusBadge, SeverityBadge } from './StatusBadge';
+import { StatusBadge } from './StatusBadge';
 import { PhotoGallery } from './PhotoGallery';
 import {
   Dialog,
@@ -16,20 +16,11 @@ import {
   DialogFooter,
   DialogDescription,
 } from '../ui/dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '../ui/dropdown-menu';
 import { Separator } from '../ui/separator';
 import { DamageReport, DamageStatus } from '../../types';
 import {
   formatDate,
   formatDateTime,
-  formatCurrency,
   CAUSE_LABELS,
   STATUS_LABELS,
 } from '../../utils/formatters';
@@ -39,13 +30,10 @@ import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 const STATUS_TRANSITIONS: Record<DamageStatus, DamageStatus[]> = {
-  DRAFT: ['REPORTED'],
-  REPORTED: ['UNDER_REVIEW', 'CLOSED'],
-  UNDER_REVIEW: ['CUSTOMER_NOTIFIED', 'CLAIM_FILED', 'RESOLVED', 'CLOSED'],
-  CUSTOMER_NOTIFIED: ['CLAIM_FILED', 'RESOLVED', 'CLOSED'],
-  CLAIM_FILED: ['RESOLVED', 'WRITTEN_OFF', 'CLOSED'],
-  RESOLVED: ['CLOSED'],
-  WRITTEN_OFF: ['CLOSED'],
+  OPEN: ['CUSTOMER_NOTIFIED'],
+  CUSTOMER_NOTIFIED: ['DESTROY_STOCK', 'REP_COLLECT'],
+  DESTROY_STOCK: ['CLOSED'],
+  REP_COLLECT: ['CLOSED'],
   CLOSED: [],
 };
 
@@ -135,8 +123,6 @@ export function DamageDetail({ damage }: DamageDetailProps) {
     }
   };
 
-  const nextStatuses = STATUS_TRANSITIONS[damage.status] || [];
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -150,7 +136,6 @@ export function DamageDetail({ damage }: DamageDetailProps) {
           <div className="flex items-center gap-3 flex-wrap">
             <h2 className="font-mono font-bold text-lg">{damage.referenceNumber}</h2>
             <StatusBadge status={damage.status} />
-            <SeverityBadge severity={damage.severity} />
           </div>
           <p className="text-sm text-muted-foreground mt-0.5">
             Reported {formatDateTime(damage.dateReported)}
@@ -166,24 +151,25 @@ export function DamageDetail({ damage }: DamageDetailProps) {
             <FileDown className="h-4 w-4" />
             {downloadingPDF ? 'Generating...' : 'Download PDF'}
           </Button>
-          {nextStatuses.length > 0 && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button size="sm" className="gap-2">
-                  Update Status
-                  <ChevronDown className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>Change Status To</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {nextStatuses.map((s) => (
-                  <DropdownMenuItem key={s} onClick={() => initiateStatusChange(s)}>
-                    {STATUS_LABELS[s]}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+          {damage.status === 'OPEN' && (
+            <Button size="sm" className="gap-2 bg-amber-600 hover:bg-amber-700" onClick={() => initiateStatusChange('CUSTOMER_NOTIFIED')}>
+              Customer Notified
+            </Button>
+          )}
+          {damage.status === 'CUSTOMER_NOTIFIED' && (
+            <>
+              <Button size="sm" className="gap-2 bg-red-600 hover:bg-red-700" onClick={() => initiateStatusChange('DESTROY_STOCK')}>
+                Destroy Stock
+              </Button>
+              <Button size="sm" className="gap-2 bg-purple-600 hover:bg-purple-700" onClick={() => initiateStatusChange('REP_COLLECT')}>
+                Rep Collect
+              </Button>
+            </>
+          )}
+          {(damage.status === 'DESTROY_STOCK' || damage.status === 'REP_COLLECT') && (
+            <Button size="sm" className="gap-2 bg-green-600 hover:bg-green-700" onClick={() => initiateStatusChange('CLOSED')}>
+              Close Report
+            </Button>
           )}
         </div>
       </div>
@@ -223,14 +209,13 @@ export function DamageDetail({ damage }: DamageDetailProps) {
                     {damage.causeOther && <span className="text-muted-foreground text-sm block">{damage.causeOther}</span>}
                   </p>
                 </div>
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Estimated Loss</p>
-                  <p className="mt-1 font-medium">{formatCurrency(damage.estimatedLoss)}</p>
-                </div>
-                {damage.locationInWarehouse && (
+                {damage.warehouseLocation && (
                   <div>
                     <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Location</p>
-                    <p className="mt-1 font-medium">{damage.locationInWarehouse}</p>
+                    <p className="mt-1 font-medium">{damage.warehouseLocation.code}</p>
+                    {damage.warehouseLocation.zone && (
+                      <p className="text-sm text-muted-foreground">{damage.warehouseLocation.zone}</p>
+                    )}
                   </div>
                 )}
                 <div>

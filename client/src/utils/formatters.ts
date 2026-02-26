@@ -25,25 +25,19 @@ export function formatFileSize(bytes: number): string {
 }
 
 export const STATUS_LABELS: Record<DamageStatus, string> = {
-  DRAFT: 'Draft',
-  REPORTED: 'Reported',
-  UNDER_REVIEW: 'Under Review',
+  OPEN: 'Open',
   CUSTOMER_NOTIFIED: 'Customer Notified',
-  CLAIM_FILED: 'Claim Filed',
-  RESOLVED: 'Resolved',
-  WRITTEN_OFF: 'Written Off',
+  DESTROY_STOCK: 'Destroy Stock',
+  REP_COLLECT: 'Rep Collect',
   CLOSED: 'Closed',
 };
 
 export const STATUS_COLORS: Record<DamageStatus, string> = {
-  DRAFT: 'bg-gray-100 text-gray-700',
-  REPORTED: 'bg-blue-100 text-blue-700',
-  UNDER_REVIEW: 'bg-yellow-100 text-yellow-700',
-  CUSTOMER_NOTIFIED: 'bg-purple-100 text-purple-700',
-  CLAIM_FILED: 'bg-orange-100 text-orange-700',
-  RESOLVED: 'bg-green-100 text-green-700',
-  WRITTEN_OFF: 'bg-red-100 text-red-700',
-  CLOSED: 'bg-gray-200 text-gray-600',
+  OPEN: 'bg-blue-100 text-blue-700',
+  CUSTOMER_NOTIFIED: 'bg-amber-100 text-amber-700',
+  DESTROY_STOCK: 'bg-red-100 text-red-700',
+  REP_COLLECT: 'bg-purple-100 text-purple-700',
+  CLOSED: 'bg-green-100 text-green-700',
 };
 
 export const SEVERITY_LABELS: Record<DamageSeverity, string> = {

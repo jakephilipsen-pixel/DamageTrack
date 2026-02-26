@@ -1,8 +1,7 @@
-import { TrendingUp, AlertCircle, DollarSign, Activity } from 'lucide-react';
+import { TrendingUp, AlertCircle, Activity } from 'lucide-react';
 import { Card, CardContent } from '../ui/card';
 import { Skeleton } from '../ui/skeleton';
 import { DashboardStats } from '../../types';
-import { formatCurrency } from '../../utils/formatters';
 
 interface DamageStatsProps {
   stats?: DashboardStats;
@@ -10,7 +9,7 @@ interface DamageStatsProps {
 }
 
 export function DamageStats({ stats, isLoading }: DamageStatsProps) {
-  const openStatuses = ['DRAFT', 'REPORTED', 'UNDER_REVIEW', 'CUSTOMER_NOTIFIED', 'CLAIM_FILED'];
+  const openStatuses = ['OPEN', 'CUSTOMER_NOTIFIED', 'DESTROY_STOCK', 'REP_COLLECT'];
   const openCount = stats?.byStatus
     .filter((s) => openStatuses.includes(s.status))
     .reduce((sum, s) => sum + s.count, 0) ?? 0;
@@ -37,20 +36,12 @@ export function DamageStats({ stats, isLoading }: DamageStatsProps) {
       color: 'text-orange-600',
       bg: 'bg-orange-50',
     },
-    {
-      label: 'Open Loss Estimate',
-      value: formatCurrency(stats?.totalOpenLoss),
-      icon: DollarSign,
-      color: 'text-red-600',
-      bg: 'bg-red-50',
-      isString: true,
-    },
   ];
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {Array.from({ length: 4 }).map((_, i) => (
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {Array.from({ length: 3 }).map((_, i) => (
           <Skeleton key={i} className="h-28" />
         ))}
       </div>
@@ -58,7 +49,7 @@ export function DamageStats({ stats, isLoading }: DamageStatsProps) {
   }
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
       {items.map((item) => (
         <Card key={item.label}>
           <CardContent className="p-5">
@@ -66,7 +57,7 @@ export function DamageStats({ stats, isLoading }: DamageStatsProps) {
               <div>
                 <p className="text-sm text-muted-foreground">{item.label}</p>
                 <p className="text-2xl font-bold mt-1">
-                  {item.isString ? item.value : item.value.toLocaleString()}
+                  {item.value.toLocaleString()}
                 </p>
               </div>
               <div className={`w-10 h-10 rounded-lg ${item.bg} flex items-center justify-center`}>

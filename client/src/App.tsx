@@ -15,6 +15,7 @@ import Products from './pages/Products';
 import Reports from './pages/Reports';
 import AdminUsers from './pages/AdminUsers';
 import AdminSettings from './pages/AdminSettings';
+import WarehouseLocations from './pages/WarehouseLocations';
 import NotFound from './pages/NotFound';
 
 function HomeRedirect() {
@@ -42,6 +43,7 @@ export default function App() {
               <Route path="/reports" element={<RoleGuard roles={['ADMIN', 'MANAGER']}><Reports /></RoleGuard>} />
               <Route path="/admin/users" element={<RoleGuard roles={['ADMIN']}><AdminUsers /></RoleGuard>} />
               <Route path="/admin/settings" element={<RoleGuard roles={['ADMIN']}><AdminSettings /></RoleGuard>} />
+              <Route path="/admin/warehouse-locations" element={<RoleGuard roles={['ADMIN']}><WarehouseLocations /></RoleGuard>} />
             </Route>
           </Route>
           <Route path="*" element={<NotFound />} />

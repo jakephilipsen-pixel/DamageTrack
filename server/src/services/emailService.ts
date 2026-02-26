@@ -21,14 +21,11 @@ function getSeverityColor(severity: string): string {
 
 function getStatusColor(status: string): string {
   switch (status) {
-    case 'DRAFT': return '#6b7280';
-    case 'REPORTED': return '#3b82f6';
-    case 'UNDER_REVIEW': return '#f59e0b';
-    case 'CUSTOMER_NOTIFIED': return '#8b5cf6';
-    case 'CLAIM_FILED': return '#ef4444';
-    case 'RESOLVED': return '#22c55e';
-    case 'WRITTEN_OFF': return '#374151';
-    case 'CLOSED': return '#059669';
+    case 'OPEN': return '#3b82f6';
+    case 'CUSTOMER_NOTIFIED': return '#f59e0b';
+    case 'DESTROY_STOCK': return '#ef4444';
+    case 'REP_COLLECT': return '#8b5cf6';
+    case 'CLOSED': return '#22c55e';
     default: return '#6b7280';
   }
 }

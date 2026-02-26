@@ -1,9 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle, Circle, ChevronRight, ChevronLeft } from 'lucide-react';
+import { CheckCircle, ChevronRight, ChevronLeft, MapPin } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -11,47 +9,26 @@ import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { PhotoUploader } from './PhotoUploader';
-import { StatusBadge, SeverityBadge } from './StatusBadge';
 import { useCustomers } from '../../hooks/useCustomers';
 import { useCreateDamage } from '../../hooks/useDamages';
+import { useWarehouseLocations } from '../../hooks/useWarehouseLocations';
 import { getProducts } from '../../api/products';
 import { uploadPhotos } from '../../api/damages';
 import { Product } from '../../types';
-import { CAUSE_LABELS, SEVERITY_LABELS, formatCurrency, formatDate } from '../../utils/formatters';
-import { DamageCause, DamageSeverity } from '../../types';
+import { CAUSE_LABELS, formatDate, formatCurrency } from '../../utils/formatters';
+import { DamageCause } from '../../types';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-
-const step1Schema = z.object({
-  customerId: z.string().min(1, 'Customer is required'),
-});
-
-const step2Schema = z.object({
-  productId: z.string().min(1, 'Product is required'),
-});
-
-const step3Schema = z.object({
-  quantity: z.number({ invalid_type_error: 'Must be a number' }).int().min(1, 'Quantity must be at least 1'),
-  severity: z.enum(['MINOR', 'MODERATE', 'MAJOR', 'TOTAL_LOSS'] as const),
-  cause: z.enum(['FORKLIFT_IMPACT', 'DROPPED_DURING_HANDLING', 'WATER_DAMAGE', 'CRUSH_DAMAGE', 'PALLET_FAILURE', 'TEMPERATURE_EXPOSURE', 'INCORRECT_STACKING', 'TRANSIT_DAMAGE_INBOUND', 'TRANSIT_DAMAGE_OUTBOUND', 'PEST_DAMAGE', 'EXPIRED_PRODUCT', 'PACKAGING_FAILURE', 'UNKNOWN', 'OTHER'] as const),
-  causeOther: z.string().optional(),
-  description: z.string().min(10, 'Description must be at least 10 characters'),
-  locationInWarehouse: z.string().optional(),
-  dateOfDamage: z.string().min(1, 'Date of damage is required'),
-  estimatedLoss: z.number().optional(),
-});
 
 type FormData = {
   customerId: string;
   productId: string;
   quantity: number;
-  severity: DamageSeverity;
   cause: DamageCause;
   causeOther?: string;
   description: string;
-  locationInWarehouse?: string;
+  warehouseLocationId?: string;
   dateOfDamage: string;
-  estimatedLoss?: number;
 };
 
 const STEPS = [
@@ -74,6 +51,8 @@ export function DamageForm() {
 
   const { data: customersData, isLoading: loadingCustomers } = useCustomers({ search: customerSearch, limit: 100 });
   const createDamage = useCreateDamage();
+  const { data: locationsData } = useWarehouseLocations({ activeOnly: true, limit: 500 });
+  const [locationSearch, setLocationSearch] = useState('');
 
   const {
     register,
@@ -88,12 +67,14 @@ export function DamageForm() {
     defaultValues: {
       quantity: 1,
       dateOfDamage: new Date().toISOString().split('T')[0],
+      warehouseLocationId: '',
     },
   });
 
   const watchedCustomerId = watch('customerId');
   const watchedCause = watch('cause');
   const watchedProductId = watch('productId');
+  const watchedLocationId = watch('warehouseLocationId');
 
   useEffect(() => {
     if (watchedCustomerId) {
@@ -116,12 +97,22 @@ export function DamageForm() {
       p.sku.toLowerCase().includes(productSearch.toLowerCase())
   );
 
+  const filteredLocations = (locationsData?.data ?? []).filter(
+    (loc) =>
+      !locationSearch ||
+      loc.code.toLowerCase().includes(locationSearch.toLowerCase()) ||
+      (loc.zone ?? '').toLowerCase().includes(locationSearch.toLowerCase()) ||
+      (loc.description ?? '').toLowerCase().includes(locationSearch.toLowerCase())
+  );
+
+  const selectedLocation = (locationsData?.data ?? []).find((l) => l.id === watchedLocationId);
+
   const goNext = async () => {
     let valid = false;
     if (step === 1) valid = await trigger('customerId');
     else if (step === 2) valid = await trigger('productId');
     else if (step === 3) {
-      valid = await trigger(['quantity', 'severity', 'cause', 'description', 'dateOfDamage']);
+      valid = await trigger(['quantity', 'cause', 'description', 'dateOfDamage']);
     } else {
       valid = true;
     }
@@ -133,7 +124,8 @@ export function DamageForm() {
   const onSubmit = async (data: FormData) => {
     setIsSubmitting(true);
     try {
-      const created = await createDamage.mutateAsync(data);
+      const payload = { ...data, warehouseLocationId: data.warehouseLocationId || undefined };
+      const created = await createDamage.mutateAsync(payload);
       if (photos.length > 0) {
         try {
           await uploadPhotos(created.id, photos);
@@ -345,42 +337,6 @@ export function DamageForm() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <Label>Severity *</Label>
-                  <Controller
-                    name="severity"
-                    control={control}
-                    rules={{ required: 'Severity is required' }}
-                    render={({ field }) => (
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <SelectTrigger className="mt-1">
-                          <SelectValue placeholder="Select severity" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {(Object.keys(SEVERITY_LABELS) as DamageSeverity[]).map((s) => (
-                            <SelectItem key={s} value={s}>{SEVERITY_LABELS[s]}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                  {errors.severity && <p className="text-xs text-destructive mt-1">{errors.severity.message}</p>}
-                </div>
-                <div>
-                  <Label htmlFor="estimatedLoss">Estimated Loss (USD)</Label>
-                  <Input
-                    id="estimatedLoss"
-                    type="number"
-                    step="0.01"
-                    min={0}
-                    placeholder="0.00"
-                    {...register('estimatedLoss', { valueAsNumber: true, setValueAs: v => v === '' ? undefined : Number(v) })}
-                    className="mt-1"
-                  />
-                </div>
-              </div>
-
               <div>
                 <Label>Cause *</Label>
                 <Controller
@@ -427,13 +383,62 @@ export function DamageForm() {
               </div>
 
               <div>
-                <Label htmlFor="locationInWarehouse">Location in Warehouse</Label>
+                <Label>Location in Warehouse</Label>
                 <Input
-                  id="locationInWarehouse"
-                  {...register('locationInWarehouse')}
-                  placeholder="e.g. Aisle B, Row 3, Shelf 2"
+                  placeholder="Search locations..."
+                  value={locationSearch}
+                  onChange={(e) => setLocationSearch(e.target.value)}
                   className="mt-1"
                 />
+                {selectedLocation && (
+                  <div className="mt-1 flex items-center gap-2 text-sm text-primary">
+                    <MapPin className="h-3.5 w-3.5 shrink-0" />
+                    <span className="font-medium">{selectedLocation.code}</span>
+                    {selectedLocation.zone && <span className="text-muted-foreground">· {selectedLocation.zone}</span>}
+                  </div>
+                )}
+                <div className="mt-1 border rounded-md max-h-40 overflow-y-auto">
+                  <Controller
+                    name="warehouseLocationId"
+                    control={control}
+                    render={({ field }) => (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => { field.onChange(''); setLocationSearch(''); }}
+                          className={cn(
+                            'w-full text-left px-3 py-2 text-sm transition-colors',
+                            !field.value
+                              ? 'bg-primary/10 text-primary font-medium'
+                              : 'hover:bg-muted text-muted-foreground'
+                          )}
+                        >
+                          — No location
+                        </button>
+                        {filteredLocations.map((loc) => (
+                          <button
+                            key={loc.id}
+                            type="button"
+                            onClick={() => { field.onChange(loc.id); setLocationSearch(''); }}
+                            className={cn(
+                              'w-full text-left px-3 py-2 text-sm border-t transition-colors',
+                              field.value === loc.id
+                                ? 'bg-primary/10 text-primary font-medium'
+                                : 'hover:bg-muted'
+                            )}
+                          >
+                            <span className="font-medium">{loc.code}</span>
+                            {loc.zone && <span className="text-muted-foreground ml-2 text-xs">· {loc.zone}</span>}
+                            {loc.description && <span className="text-muted-foreground ml-1 text-xs">{loc.description}</span>}
+                          </button>
+                        ))}
+                        {filteredLocations.length === 0 && locationSearch && (
+                          <p className="px-3 py-2 text-sm text-muted-foreground">No locations match "{locationSearch}"</p>
+                        )}
+                      </>
+                    )}
+                  />
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -483,19 +488,6 @@ export function DamageForm() {
                   <p className="mt-1 font-medium">{values.quantity} units</p>
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Severity</p>
-                  <div className="mt-1">
-                    {values.severity && <SeverityBadge severity={values.severity} />}
-                  </div>
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Est. Loss</p>
-                  <p className="mt-1 font-medium">{formatCurrency(values.estimatedLoss)}</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Date of Damage</p>
                   <p className="mt-1 font-medium">
                     {values.dateOfDamage ? formatDate(values.dateOfDamage) : '—'}
@@ -510,10 +502,14 @@ export function DamageForm() {
                 </div>
               </div>
 
-              {values.locationInWarehouse && (
+              {selectedLocation && (
                 <div>
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Location</p>
-                  <p className="mt-1 font-medium">{values.locationInWarehouse}</p>
+                  <p className="mt-1 font-medium flex items-center gap-1.5">
+                    <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+                    {selectedLocation.code}
+                    {selectedLocation.zone && <span className="text-muted-foreground font-normal">· {selectedLocation.zone}</span>}
+                  </p>
                 </div>
               )}
 

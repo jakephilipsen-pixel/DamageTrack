@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
-import { StatusBadge, SeverityBadge } from '../damages/StatusBadge';
+import { StatusBadge } from '../damages/StatusBadge';
 import { Skeleton } from '../ui/skeleton';
 import { useDamages } from '../../hooks/useDamages';
 import { formatDate, CAUSE_LABELS } from '../../utils/formatters';
@@ -33,7 +33,6 @@ export function CustomerDamageHistory({ customerId }: CustomerDamageHistoryProps
           <TableHead>Date</TableHead>
           <TableHead>Product</TableHead>
           <TableHead>Cause</TableHead>
-          <TableHead>Severity</TableHead>
           <TableHead>Status</TableHead>
         </TableRow>
       </TableHeader>
@@ -50,7 +49,6 @@ export function CustomerDamageHistory({ customerId }: CustomerDamageHistoryProps
             <TableCell className="text-sm">{formatDate(damage.dateOfDamage)}</TableCell>
             <TableCell className="text-sm">{damage.product?.name}</TableCell>
             <TableCell className="text-sm">{CAUSE_LABELS[damage.cause]}</TableCell>
-            <TableCell><SeverityBadge severity={damage.severity} /></TableCell>
             <TableCell><StatusBadge status={damage.status} /></TableCell>
           </TableRow>
         ))}
