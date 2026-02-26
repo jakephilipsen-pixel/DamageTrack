@@ -5,11 +5,23 @@ import { Request } from 'express';
 export async function generateReferenceNumber(): Promise<string> {
   const today = new Date();
   const dateStr = format(today, 'yyyyMMdd');
-  const todayStart = startOfDay(today);
-  const count = await prisma.damageReport.count({
-    where: { dateReported: { gte: todayStart } },
+  const prefix = `DMG-${dateStr}-`;
+
+  // Find the highest existing sequence number for today to avoid collisions
+  const latest = await prisma.damageReport.findFirst({
+    where: { referenceNumber: { startsWith: prefix } },
+    orderBy: { referenceNumber: 'desc' },
+    select: { referenceNumber: true },
   });
-  return `DMG-${dateStr}-${String(count + 1).padStart(4, '0')}`;
+
+  let nextSeq = 1;
+  if (latest?.referenceNumber) {
+    const seqStr = latest.referenceNumber.slice(prefix.length);
+    const parsed = parseInt(seqStr, 10);
+    if (!isNaN(parsed)) nextSeq = parsed + 1;
+  }
+
+  return `${prefix}${String(nextSeq).padStart(4, '0')}`;
 }
 
 export function getClientIp(req: Request): string {

@@ -3,6 +3,10 @@ import { format } from 'date-fns';
 import { Prisma } from '@prisma/client';
 import prisma from '../config/database';
 import { DamageStatus, DamageSeverity, DamageCause } from '@prisma/client';
+import path from 'path';
+import fs from 'fs';
+
+const UPLOAD_DIR = process.env.UPLOAD_DIR || './uploads';
 
 function formatLabel(str: string | null | undefined): string {
   if (!str) return '';
@@ -12,9 +16,39 @@ function formatLabel(str: string | null | undefined): string {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+function hexToRgb(hex: string): [number, number, number] {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return [r, g, b];
+}
+
+function lightenColor(hex: string, amount: number): string {
+  const [r, g, b] = hexToRgb(hex);
+  const lr = Math.min(255, Math.round(r + (255 - r) * amount));
+  const lg = Math.min(255, Math.round(g + (255 - g) * amount));
+  const lb = Math.min(255, Math.round(b + (255 - b) * amount));
+  return `#${lr.toString(16).padStart(2, '0')}${lg.toString(16).padStart(2, '0')}${lb.toString(16).padStart(2, '0')}`;
+}
+
 type FullDamageReport = Awaited<ReturnType<typeof import('./damageService').getDamageById>>;
 
+async function getBranding() {
+  const settings = await prisma.brandingSettings.findUnique({ where: { id: 'default' } });
+  return settings || {
+    companyName: 'DamageTrack',
+    tagline: 'Warehouse Damage Management',
+    primaryColor: '#3b82f6',
+    secondaryColor: '#1e293b',
+    accentColor: '#10b981',
+    pdfFooterText: null,
+    logoPath: null,
+  };
+}
+
 export async function generatePDF(report: FullDamageReport): Promise<Buffer> {
+  const branding = await getBranding();
+
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({
       size: 'A4',
@@ -27,18 +61,33 @@ export async function generatePDF(report: FullDamageReport): Promise<Buffer> {
     doc.on('error', reject);
 
     const pageWidth = doc.page.width - 120;
-    const primaryColor = '#1e3a5f';
-    const accentColor = '#e74c3c';
+    const primaryColor = branding.primaryColor;
+    const secondaryColor = branding.secondaryColor;
+    const sectionBgColor = lightenColor(primaryColor, 0.85);
 
-    doc.rect(0, 0, doc.page.width, 80).fill(primaryColor);
+    // Header background
+    doc.rect(0, 0, doc.page.width, 80).fill(secondaryColor);
+
+    // Logo + Company name in header
+    let headerTextX = 60;
+    const logoPath = path.resolve(UPLOAD_DIR, 'branding', 'logo-pdf.png');
+    if (branding.logoPath && fs.existsSync(logoPath)) {
+      try {
+        doc.image(logoPath, 60, 12, { height: 56 });
+        headerTextX = 180;
+      } catch {
+        // Logo failed to load, use text only
+      }
+    }
+
     doc.fillColor('#ffffff')
       .font('Helvetica-Bold')
       .fontSize(20)
-      .text('DAMAGE REPORT', 60, 22);
+      .text('DAMAGE REPORT', headerTextX, 22);
 
     doc.fontSize(11)
       .font('Helvetica')
-      .text(`Reference: ${report.referenceNumber}`, 60, 50);
+      .text(`Reference: ${report.referenceNumber}`, headerTextX, 50);
 
     doc.fillColor('#ffffff').font('Helvetica')
       .fontSize(10)
@@ -49,6 +98,7 @@ export async function generatePDF(report: FullDamageReport): Promise<Buffer> {
 
     doc.moveDown(4);
 
+    // Status badge
     const statusColors: Record<string, string> = {
       OPEN: '#3b82f6',
       CUSTOMER_NOTIFIED: '#f59e0b',
@@ -58,7 +108,6 @@ export async function generatePDF(report: FullDamageReport): Promise<Buffer> {
     };
 
     const statusBadgeColor = statusColors[report.status] || '#6b7280';
-
     const badgeY = doc.y;
     const badgeHeight = 22;
 
@@ -73,7 +122,7 @@ export async function generatePDF(report: FullDamageReport): Promise<Buffer> {
 
     function sectionHeader(title: string): void {
       const y = doc.y;
-      doc.rect(60, y, pageWidth, 22).fill('#e8edf4');
+      doc.rect(60, y, pageWidth, 22).fill(sectionBgColor);
       doc.fillColor(primaryColor).font('Helvetica-Bold').fontSize(11)
         .text(title, 68, y + 6);
       doc.moveDown(1.5);
@@ -161,22 +210,27 @@ export async function generatePDF(report: FullDamageReport): Promise<Buffer> {
 
     if (photoCount > 0) {
       doc.fillColor('#6b7280').font('Helvetica-Oblique').fontSize(9)
-        .text(`Note: This report has ${photoCount} photo(s) attached. View them in the DamageTrack system.`, 60, doc.y, {
+        .text(`Note: This report has ${photoCount} photo(s) attached. View them in the ${branding.companyName} system.`, 60, doc.y, {
           width: pageWidth,
         });
     }
 
-    if (accentColor) {
-      const footerY = doc.page.height - 45;
-      doc.rect(0, footerY, doc.page.width, 1).fill('#e5e7eb');
-      doc.fillColor('#9ca3af').font('Helvetica').fontSize(8)
-        .text(
-          `DamageTrack — Warehouse Damage Management System | Report: ${report.referenceNumber} | Page 1`,
-          60,
-          footerY + 10,
-          { width: pageWidth, align: 'center' }
-        );
-    }
+    // Footer
+    const footerY = doc.page.height - 50;
+    // Subtle footer bar
+    doc.rect(0, footerY - 5, doc.page.width, 1).fill(lightenColor(secondaryColor, 0.7));
+
+    const footerText = branding.pdfFooterText || branding.companyName;
+    const generatedDate = format(new Date(), 'dd MMM yyyy HH:mm');
+
+    doc.fillColor('#9ca3af').font('Helvetica').fontSize(8)
+      .text(footerText, 60, footerY + 5, { width: pageWidth * 0.4, align: 'left' });
+
+    doc.fillColor('#9ca3af').font('Helvetica').fontSize(8)
+      .text(generatedDate, 60 + pageWidth * 0.35, footerY + 5, { width: pageWidth * 0.3, align: 'center' });
+
+    doc.fillColor('#9ca3af').font('Helvetica').fontSize(8)
+      .text(`Page 1 of 1`, 60 + pageWidth * 0.6, footerY + 5, { width: pageWidth * 0.4, align: 'right' });
 
     doc.end();
   });

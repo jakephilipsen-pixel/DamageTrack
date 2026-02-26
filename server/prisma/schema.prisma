@@ -217,3 +217,19 @@ model SystemSetting {
   value       String
   updatedAt   DateTime  @updatedAt
 }
+
+model BrandingSettings {
+  id              String    @id @default("default")
+  companyName     String    @default("DamageTrack")
+  tagline         String?   @default("Warehouse Damage Management")
+  logoPath        String?
+  logoMimeType    String?
+  faviconPath     String?
+  primaryColor    String    @default("#3b82f6")
+  secondaryColor  String    @default("#1e293b")
+  accentColor     String    @default("#10b981")
+  emailFromName   String?
+  pdfFooterText   String?
+  updatedAt       DateTime  @updatedAt
+  updatedBy       String?
+}

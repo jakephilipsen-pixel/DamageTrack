@@ -17,6 +17,7 @@ import {
   DialogFooter,
 } from '../components/ui/dialog';
 import { useAuth } from '../hooks/useAuth';
+import { useBranding } from '../contexts/BrandingContext';
 import { changePassword } from '../api/auth';
 import { loginSchema, changePasswordSchema } from '../utils/validators';
 import { toast } from 'sonner';
@@ -27,6 +28,7 @@ type ChangePasswordForm = z.infer<typeof changePasswordSchema>;
 export default function Login() {
   const navigate = useNavigate();
   const { login, isAuthenticated, user, refreshUser } = useAuth();
+  const { branding } = useBranding();
   const [loginError, setLoginError] = useState('');
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [isChanging, setIsChanging] = useState(false);
@@ -47,6 +49,10 @@ export default function Login() {
   } = useForm<ChangePasswordForm>({
     resolver: zodResolver(changePasswordSchema),
   });
+
+  useEffect(() => {
+    document.title = `${branding.companyName} — Login`;
+  }, [branding.companyName]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -84,15 +90,33 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800 p-4">
+    <div
+      className="min-h-screen flex items-center justify-center p-4"
+      style={{ background: `linear-gradient(to bottom right, ${branding.secondaryColor}, ${branding.secondaryColor}dd)` }}
+    >
       <div className="w-full max-w-md">
-        {/* Logo */}
+        {/* Logo / Company Name */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-primary rounded-2xl mb-4">
-            <Warehouse className="h-8 w-8 text-white" />
-          </div>
-          <h1 className="text-3xl font-bold text-white">DamageTrack</h1>
-          <p className="text-slate-400 mt-1">3PL Warehouse Damage Management</p>
+          {branding.logoUrl ? (
+            <div className="flex justify-center mb-4">
+              <img
+                src={branding.logoUrl}
+                alt={branding.companyName}
+                className="max-h-20 w-auto drop-shadow-lg"
+              />
+            </div>
+          ) : (
+            <div
+              className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4"
+              style={{ backgroundColor: branding.primaryColor }}
+            >
+              <Warehouse className="h-8 w-8 text-white" />
+            </div>
+          )}
+          <h1 className="text-3xl font-bold text-white">{branding.companyName}</h1>
+          {branding.tagline && (
+            <p className="text-slate-400 mt-1">{branding.tagline}</p>
+          )}
         </div>
 
         <Card className="shadow-2xl">
@@ -141,6 +165,7 @@ export default function Login() {
               <Button
                 type="submit"
                 className="w-full"
+                style={{ backgroundColor: branding.primaryColor }}
                 disabled={isSubmitting}
               >
                 {isSubmitting ? 'Signing in...' : 'Sign In'}
@@ -150,7 +175,7 @@ export default function Login() {
         </Card>
 
         <p className="text-center text-slate-500 text-xs mt-4">
-          DamageTrack v1.0 — Contact your administrator if you need access.
+          {branding.companyName} v1.0 — Contact your administrator if you need access.
         </p>
       </div>
 

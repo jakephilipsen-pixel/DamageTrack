@@ -800,6 +800,21 @@ async function main() {
     });
   }
 
+  console.log('Creating branding settings...');
+
+  await prisma.brandingSettings.upsert({
+    where: { id: 'default' },
+    update: {},
+    create: {
+      id: 'default',
+      companyName: 'DamageTrack',
+      tagline: 'Warehouse Damage Management',
+      primaryColor: '#3b82f6',
+      secondaryColor: '#1e293b',
+      accentColor: '#10b981',
+    },
+  });
+
   console.log('Creating system settings...');
 
   await prisma.systemSetting.createMany({

@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Plus, AlertTriangle } from 'lucide-react';
+import { useBranding } from '../contexts/BrandingContext';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { DamageStats } from '../components/reports/DamageStats';
@@ -14,6 +15,12 @@ import { DamageCause, DamageStatus } from '../types';
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { branding } = useBranding();
+
+  useEffect(() => {
+    document.title = `${branding.companyName} — Dashboard`;
+  }, [branding.companyName]);
+
   const { data: stats, isLoading } = useQuery({
     queryKey: ['dashboard-stats'],
     queryFn: () => getDashboardStats(),

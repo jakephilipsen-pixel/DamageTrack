@@ -26,12 +26,14 @@ import adminRoutes from './routes/admin';
 import importRoutes from './routes/import';
 import notificationRoutes from './routes/notifications';
 import warehouseLocationRoutes from './routes/warehouseLocations';
+import brandingRoutes from './routes/branding';
 
 const app = express();
 const PORT = process.env.APP_PORT || 3001;
 const UPLOAD_DIR = process.env.UPLOAD_DIR || './uploads';
 
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+fs.mkdirSync(path.join(UPLOAD_DIR, 'branding'), { recursive: true });
 fs.mkdirSync(path.resolve(process.cwd(), 'logs'), { recursive: true });
 
 app.use(
@@ -83,6 +85,7 @@ app.get('/health', (_req, res) => {
 });
 
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+app.use('/api/branding', brandingRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/damages', authenticate, damageRoutes);
 app.use('/api/customers', authenticate, customerRoutes);

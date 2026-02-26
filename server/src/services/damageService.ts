@@ -209,36 +209,46 @@ export async function createDamage(
   },
   userId: string
 ) {
-  const referenceNumber = await generateReferenceNumber();
-
-  const report = await prisma.damageReport.create({
-    data: {
-      referenceNumber,
-      customerId: data.customerId,
-      productId: data.productId,
-      quantity: data.quantity,
-      severity: data.severity ?? null,
-      cause: data.cause,
-      causeOther: data.causeOther ?? null,
-      description: data.description,
-      warehouseLocationId: data.warehouseLocationId ?? null,
-      estimatedLoss: data.estimatedLoss !== undefined ? data.estimatedLoss : null,
-      dateOfDamage: new Date(data.dateOfDamage),
-      status: data.status || DamageStatus.OPEN,
-      reportedById: userId,
-      statusHistory: {
-        create: {
-          fromStatus: null,
-          toStatus: data.status || DamageStatus.OPEN,
-          changedBy: userId,
-          note: 'Damage report created',
+  // Retry up to 3 times on reference number collision (concurrent inserts)
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const referenceNumber = await generateReferenceNumber();
+    try {
+      const report = await prisma.damageReport.create({
+        data: {
+          referenceNumber,
+          customerId: data.customerId,
+          productId: data.productId,
+          quantity: data.quantity,
+          severity: data.severity ?? null,
+          cause: data.cause,
+          causeOther: data.causeOther ?? null,
+          description: data.description,
+          warehouseLocationId: data.warehouseLocationId ?? null,
+          estimatedLoss: data.estimatedLoss !== undefined ? data.estimatedLoss : null,
+          dateOfDamage: new Date(data.dateOfDamage),
+          status: data.status || DamageStatus.OPEN,
+          reportedById: userId,
+          statusHistory: {
+            create: {
+              fromStatus: null,
+              toStatus: data.status || DamageStatus.OPEN,
+              changedBy: userId,
+              note: 'Damage report created',
+            },
+          },
         },
-      },
-    },
-    include: damageIncludeFull,
-  });
-
-  return serializeDamageReport(report);
+        include: damageIncludeFull,
+      });
+      return serializeDamageReport(report);
+    } catch (err: any) {
+      // P2002 = unique constraint violation
+      if (err.code === 'P2002' && attempt < 2) {
+        continue; // retry with a new reference number
+      }
+      throw err;
+    }
+  }
+  throw new Error('Failed to generate unique reference number after 3 attempts');
 }
 
 export async function updateDamage(

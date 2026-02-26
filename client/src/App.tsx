@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { AuthProvider } from './contexts/AuthContext';
+import { BrandingProvider } from './contexts/BrandingContext';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { RoleGuard } from './components/auth/RoleGuard';
 import { MainLayout } from './components/layout/MainLayout';
@@ -15,6 +16,7 @@ import Products from './pages/Products';
 import Reports from './pages/Reports';
 import AdminUsers from './pages/AdminUsers';
 import AdminSettings from './pages/AdminSettings';
+import AdminBranding from './pages/AdminBranding';
 import WarehouseLocations from './pages/WarehouseLocations';
 import NotFound from './pages/NotFound';
 
@@ -26,29 +28,32 @@ function HomeRedirect() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <Toaster richColors position="top-right" />
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route element={<ProtectedRoute />}>
-            <Route element={<MainLayout />}>
-              <Route path="/" element={<HomeRedirect />} />
-              <Route path="/dashboard" element={<RoleGuard roles={['ADMIN', 'MANAGER']}><Dashboard /></RoleGuard>} />
-              <Route path="/damages" element={<DamageList />} />
-              <Route path="/damages/new" element={<DamageNew />} />
-              <Route path="/damages/:id" element={<DamageView />} />
-              <Route path="/customers" element={<RoleGuard roles={['ADMIN', 'MANAGER']}><Customers /></RoleGuard>} />
-              <Route path="/products" element={<RoleGuard roles={['ADMIN', 'MANAGER']}><Products /></RoleGuard>} />
-              <Route path="/reports" element={<RoleGuard roles={['ADMIN', 'MANAGER']}><Reports /></RoleGuard>} />
-              <Route path="/admin/users" element={<RoleGuard roles={['ADMIN']}><AdminUsers /></RoleGuard>} />
-              <Route path="/admin/settings" element={<RoleGuard roles={['ADMIN']}><AdminSettings /></RoleGuard>} />
-              <Route path="/admin/warehouse-locations" element={<RoleGuard roles={['ADMIN']}><WarehouseLocations /></RoleGuard>} />
+    <BrandingProvider>
+      <AuthProvider>
+        <BrowserRouter>
+          <Toaster richColors position="top-right" />
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route element={<ProtectedRoute />}>
+              <Route element={<MainLayout />}>
+                <Route path="/" element={<HomeRedirect />} />
+                <Route path="/dashboard" element={<RoleGuard roles={['ADMIN', 'MANAGER']}><Dashboard /></RoleGuard>} />
+                <Route path="/damages" element={<DamageList />} />
+                <Route path="/damages/new" element={<DamageNew />} />
+                <Route path="/damages/:id" element={<DamageView />} />
+                <Route path="/customers" element={<RoleGuard roles={['ADMIN', 'MANAGER']}><Customers /></RoleGuard>} />
+                <Route path="/products" element={<RoleGuard roles={['ADMIN', 'MANAGER']}><Products /></RoleGuard>} />
+                <Route path="/reports" element={<RoleGuard roles={['ADMIN', 'MANAGER']}><Reports /></RoleGuard>} />
+                <Route path="/admin/users" element={<RoleGuard roles={['ADMIN']}><AdminUsers /></RoleGuard>} />
+                <Route path="/admin/settings" element={<RoleGuard roles={['ADMIN']}><AdminSettings /></RoleGuard>} />
+                <Route path="/admin/branding" element={<RoleGuard roles={['ADMIN']}><AdminBranding /></RoleGuard>} />
+                <Route path="/admin/warehouse-locations" element={<RoleGuard roles={['ADMIN']}><WarehouseLocations /></RoleGuard>} />
+              </Route>
             </Route>
-          </Route>
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </AuthProvider>
+    </BrandingProvider>
   );
 }

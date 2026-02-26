@@ -12,9 +12,11 @@ import {
   LogOut,
   Warehouse,
   MapPin,
+  Palette,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '../../hooks/useAuth';
+import { useBranding } from '../../contexts/BrandingContext';
 import { Button } from '../ui/button';
 
 interface NavItem {
@@ -40,6 +42,7 @@ const navItems = [
 const adminItems = [
   { to: '/admin/users', icon: Users, label: 'Users', roles: ['ADMIN'] },
   { to: '/admin/warehouse-locations', icon: MapPin, label: 'Locations', roles: ['ADMIN'] },
+  { to: '/admin/branding', icon: Palette, label: 'Branding', roles: ['ADMIN'] },
   { to: '/admin/settings', icon: Settings, label: 'Settings', roles: ['ADMIN'] },
 ];
 
@@ -51,6 +54,7 @@ const ROLE_LABELS: Record<string, string> = {
 
 export function Sidebar({ onNavClick }: SidebarProps) {
   const { user, logout } = useAuth();
+  const { branding } = useBranding();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -62,22 +66,46 @@ export function Sidebar({ onNavClick }: SidebarProps) {
   const visibleAdmin = adminItems.filter(item => user && item.roles.includes(user.role));
 
   return (
-    <div className="flex flex-col h-full bg-sidebar text-sidebar-foreground">
-      {/* Logo */}
-      <div className="flex items-center gap-3 px-6 py-5 border-b border-sidebar-border">
-        <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-primary">
-          <Warehouse className="w-5 h-5 text-white" />
-        </div>
-        <div>
-          <div className="font-bold text-lg leading-none">DamageTrack</div>
-          <div className="text-xs text-sidebar-foreground/60 mt-0.5">3PL Damage Management</div>
-        </div>
+    <div
+      className="flex flex-col h-full text-sidebar-foreground"
+      style={{ backgroundColor: branding.secondaryColor }}
+    >
+      {/* Logo / Company Name */}
+      <div className="flex items-center gap-3 px-6 py-5 border-b border-white/10">
+        {branding.logoMediumUrl ? (
+          <img
+            src={branding.logoMediumUrl}
+            alt={branding.companyName}
+            className="max-w-[160px] max-h-10 w-auto"
+          />
+        ) : (
+          <>
+            <div
+              className="flex items-center justify-center w-9 h-9 rounded-lg"
+              style={{ backgroundColor: branding.primaryColor }}
+            >
+              <Warehouse className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <div className="font-bold text-lg leading-none text-white">{branding.companyName}</div>
+            </div>
+          </>
+        )}
+        {!branding.logoMediumUrl && branding.tagline && (
+          <div className="hidden" /> // tagline shown below for non-logo
+        )}
       </div>
+      {branding.tagline && (
+        <div className="px-6 pt-1 pb-0">
+          <p className="text-xs text-white/50">{branding.tagline}</p>
+        </div>
+      )}
 
       {/* New Report Button */}
       <div className="px-4 py-3">
         <Button
-          className="w-full bg-primary hover:bg-primary/90 text-white gap-2"
+          className="w-full text-white gap-2"
+          style={{ backgroundColor: branding.primaryColor }}
           onClick={() => {
             navigate('/damages/new');
             onNavClick?.();
@@ -99,9 +127,12 @@ export function Sidebar({ onNavClick }: SidebarProps) {
               cn(
                 'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
                 isActive
-                  ? 'bg-sidebar-accent text-white'
-                  : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+                  ? 'text-white'
+                  : 'text-white/70 hover:text-white hover:bg-white/10'
               )
+            }
+            style={({ isActive }) =>
+              isActive ? { backgroundColor: branding.primaryColor } : {}
             }
           >
             <item.icon className="w-4 h-4 shrink-0" />
@@ -112,7 +143,7 @@ export function Sidebar({ onNavClick }: SidebarProps) {
         {visibleAdmin.length > 0 && (
           <>
             <div className="pt-4 pb-1 px-3">
-              <p className="text-xs font-semibold text-sidebar-foreground/40 uppercase tracking-wider">Admin</p>
+              <p className="text-xs font-semibold text-white/40 uppercase tracking-wider">Admin</p>
             </div>
             {visibleAdmin.map((item) => (
               <NavLink
@@ -123,9 +154,12 @@ export function Sidebar({ onNavClick }: SidebarProps) {
                   cn(
                     'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
                     isActive
-                      ? 'bg-sidebar-accent text-white'
-                      : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+                      ? 'text-white'
+                      : 'text-white/70 hover:text-white hover:bg-white/10'
                   )
+                }
+                style={({ isActive }) =>
+                  isActive ? { backgroundColor: branding.primaryColor } : {}
                 }
               >
                 <item.icon className="w-4 h-4 shrink-0" />
@@ -137,19 +171,22 @@ export function Sidebar({ onNavClick }: SidebarProps) {
       </nav>
 
       {/* User section */}
-      <div className="border-t border-sidebar-border p-4">
+      <div className="border-t border-white/10 p-4">
         <div className="flex items-center gap-3 mb-3">
-          <div className="w-8 h-8 rounded-full bg-primary/30 flex items-center justify-center text-sm font-semibold text-white shrink-0">
+          <div
+            className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold text-white shrink-0"
+            style={{ backgroundColor: `${branding.primaryColor}50` }}
+          >
             {user?.firstName?.[0]}{user?.lastName?.[0]}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate">{user?.firstName} {user?.lastName}</p>
-            <p className="text-xs text-sidebar-foreground/50 truncate">{user?.role ? ROLE_LABELS[user.role] : ''}</p>
+            <p className="text-sm font-medium truncate text-white">{user?.firstName} {user?.lastName}</p>
+            <p className="text-xs text-white/50 truncate">{user?.role ? ROLE_LABELS[user.role] : ''}</p>
           </div>
         </div>
         <button
           onClick={handleLogout}
-          className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors"
+          className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-white/70 hover:bg-white/10 hover:text-white transition-colors"
         >
           <LogOut className="w-4 h-4" />
           Sign Out
