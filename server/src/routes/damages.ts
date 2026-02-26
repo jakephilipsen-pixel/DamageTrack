@@ -16,11 +16,11 @@ const createDamageSchema = z.object({
   customerId: z.string().cuid('Invalid customer ID'),
   productId: z.string().cuid('Invalid product ID'),
   quantity: z.number().int().positive('Quantity must be a positive integer'),
-  severity: z.nativeEnum(DamageSeverity),
+  severity: z.nativeEnum(DamageSeverity).optional(),
   cause: z.nativeEnum(DamageCause),
   causeOther: z.string().max(500).optional(),
   description: z.string().min(10, 'Description must be at least 10 characters').max(5000),
-  locationInWarehouse: z.string().max(200).optional(),
+  warehouseLocationId: z.string().cuid().optional(),
   estimatedLoss: z.number().nonnegative().optional(),
   dateOfDamage: z.string().refine((val) => !isNaN(Date.parse(val)), 'Invalid date'),
   status: z.nativeEnum(DamageStatus).optional(),
@@ -30,11 +30,11 @@ const updateDamageSchema = z.object({
   customerId: z.string().cuid().optional(),
   productId: z.string().cuid().optional(),
   quantity: z.number().int().positive().optional(),
-  severity: z.nativeEnum(DamageSeverity).optional(),
+  severity: z.nativeEnum(DamageSeverity).nullable().optional(),
   cause: z.nativeEnum(DamageCause).optional(),
   causeOther: z.string().max(500).nullable().optional(),
   description: z.string().min(10).max(5000).optional(),
-  locationInWarehouse: z.string().max(200).nullable().optional(),
+  warehouseLocationId: z.string().cuid().nullable().optional(),
   estimatedLoss: z.number().nonnegative().nullable().optional(),
   dateOfDamage: z
     .string()
@@ -49,6 +49,10 @@ const changeStatusSchema = z.object({
 
 const addCommentSchema = z.object({
   content: z.string().min(1, 'Comment cannot be empty').max(2000),
+});
+
+const bulkArchiveSchema = z.object({
+  ids: z.array(z.string()).min(1, 'At least one ID required').max(50, 'Maximum 50 IDs'),
 });
 
 const bulkStatusSchema = z.object({
@@ -96,6 +100,7 @@ router.get('/', async (req: Request, res: Response) => {
     dateFrom: req.query.dateFrom as string | undefined,
     dateTo: req.query.dateTo as string | undefined,
     reportedById: req.query.reportedById as string | undefined,
+    isArchived: req.query.isArchived === 'true' ? true : undefined,
   };
 
   const result = await damageService.getDamages(filters, pagination);
@@ -145,6 +150,26 @@ router.post('/', validate(createDamageSchema), async (req: Request, res: Respons
  *       200:
  *         description: Bulk result with updated count and skipped entries
  */
+router.patch('/bulk-archive', requireManagerOrAdmin, validate(bulkArchiveSchema), async (req: Request, res: Response) => {
+  const { ids } = req.body as { ids: string[] };
+  const result = await damageService.bulkArchive(ids);
+
+  for (const id of ids) {
+    if (!result.skipped.find((s) => s.id === id)) {
+      await createAuditLog({
+        userId: req.user!.userId,
+        action: 'ARCHIVE',
+        entity: 'DamageReport',
+        entityId: id,
+        details: { bulk: true },
+        ipAddress: getClientIp(req),
+      });
+    }
+  }
+
+  res.json({ data: result });
+});
+
 router.patch('/bulk-status', requireManagerOrAdmin, validate(bulkStatusSchema), async (req: Request, res: Response) => {
   const { ids, status, note } = req.body as { ids: string[]; status: DamageStatus; note?: string };
   let updated = 0;

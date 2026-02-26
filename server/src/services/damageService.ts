@@ -4,13 +4,10 @@ import { generateReferenceNumber } from '../utils/helpers';
 import { DamageFilters } from '../types';
 
 const VALID_TRANSITIONS: Record<DamageStatus, DamageStatus[]> = {
-  DRAFT: ['REPORTED'],
-  REPORTED: ['UNDER_REVIEW', 'CLOSED'],
-  UNDER_REVIEW: ['CUSTOMER_NOTIFIED', 'CLAIM_FILED', 'RESOLVED', 'CLOSED'],
-  CUSTOMER_NOTIFIED: ['CLAIM_FILED', 'RESOLVED', 'CLOSED'],
-  CLAIM_FILED: ['RESOLVED', 'WRITTEN_OFF', 'CLOSED'],
-  RESOLVED: ['CLOSED'],
-  WRITTEN_OFF: ['CLOSED'],
+  OPEN: ['CUSTOMER_NOTIFIED'],
+  CUSTOMER_NOTIFIED: ['DESTROY_STOCK', 'REP_COLLECT'],
+  DESTROY_STOCK: ['CLOSED'],
+  REP_COLLECT: ['CLOSED'],
   CLOSED: [],
 };
 
@@ -18,6 +15,9 @@ const damageIncludeFull = {
   customer: true,
   product: {
     include: { customer: true },
+  },
+  warehouseLocation: {
+    select: { id: true, code: true, zone: true, aisle: true, rack: true, shelf: true, description: true },
   },
   reportedBy: {
     select: {
@@ -68,6 +68,9 @@ const damageIncludeList = {
   product: {
     select: { id: true, sku: true, name: true },
   },
+  warehouseLocation: {
+    select: { id: true, code: true, zone: true, description: true },
+  },
   reportedBy: {
     select: {
       id: true,
@@ -84,12 +87,16 @@ const damageIncludeList = {
 function buildDamageWhere(filters: DamageFilters): Prisma.DamageReportWhereInput {
   const where: Prisma.DamageReportWhereInput = {};
 
+  // Exclude archived by default; only show archived when explicitly requested
+  where.isArchived = filters.isArchived === true ? true : false;
+
   if (filters.search) {
     const search = filters.search.trim();
     where.OR = [
       { referenceNumber: { contains: search, mode: 'insensitive' } },
       { description: { contains: search, mode: 'insensitive' } },
-      { locationInWarehouse: { contains: search, mode: 'insensitive' } },
+      { warehouseLocation: { code: { contains: search, mode: 'insensitive' } } },
+      { warehouseLocation: { description: { contains: search, mode: 'insensitive' } } },
       { customer: { name: { contains: search, mode: 'insensitive' } } },
       { product: { name: { contains: search, mode: 'insensitive' } } },
       { product: { sku: { contains: search, mode: 'insensitive' } } },
@@ -191,11 +198,11 @@ export async function createDamage(
     customerId: string;
     productId: string;
     quantity: number;
-    severity: DamageSeverity;
+    severity?: DamageSeverity;
     cause: DamageCause;
     causeOther?: string;
     description: string;
-    locationInWarehouse?: string;
+    warehouseLocationId?: string;
     estimatedLoss?: number;
     dateOfDamage: string;
     status?: DamageStatus;
@@ -210,19 +217,19 @@ export async function createDamage(
       customerId: data.customerId,
       productId: data.productId,
       quantity: data.quantity,
-      severity: data.severity,
+      severity: data.severity ?? null,
       cause: data.cause,
       causeOther: data.causeOther ?? null,
       description: data.description,
-      locationInWarehouse: data.locationInWarehouse ?? null,
+      warehouseLocationId: data.warehouseLocationId ?? null,
       estimatedLoss: data.estimatedLoss !== undefined ? data.estimatedLoss : null,
       dateOfDamage: new Date(data.dateOfDamage),
-      status: data.status || DamageStatus.DRAFT,
+      status: data.status || DamageStatus.OPEN,
       reportedById: userId,
       statusHistory: {
         create: {
           fromStatus: null,
-          toStatus: data.status || DamageStatus.DRAFT,
+          toStatus: data.status || DamageStatus.OPEN,
           changedBy: userId,
           note: 'Damage report created',
         },
@@ -240,11 +247,11 @@ export async function updateDamage(
     customerId?: string;
     productId?: string;
     quantity?: number;
-    severity?: DamageSeverity;
+    severity?: DamageSeverity | null;
     cause?: DamageCause;
     causeOther?: string | null;
     description?: string;
-    locationInWarehouse?: string | null;
+    warehouseLocationId?: string | null;
     estimatedLoss?: number | null;
     dateOfDamage?: string;
   },
@@ -264,7 +271,11 @@ export async function updateDamage(
   if (data.cause !== undefined) updateData.cause = data.cause;
   if (data.causeOther !== undefined) updateData.causeOther = data.causeOther;
   if (data.description !== undefined) updateData.description = data.description;
-  if (data.locationInWarehouse !== undefined) updateData.locationInWarehouse = data.locationInWarehouse;
+  if (data.warehouseLocationId !== undefined) {
+    updateData.warehouseLocation = data.warehouseLocationId
+      ? { connect: { id: data.warehouseLocationId } }
+      : { disconnect: true };
+  }
   if (data.estimatedLoss !== undefined) updateData.estimatedLoss = data.estimatedLoss;
   if (data.dateOfDamage !== undefined) updateData.dateOfDamage = new Date(data.dateOfDamage);
 
@@ -313,7 +324,7 @@ export async function changeStatus(
     status: newStatus,
   };
 
-  if (newStatus === DamageStatus.RESOLVED || newStatus === DamageStatus.CLOSED || newStatus === DamageStatus.WRITTEN_OFF) {
+  if (newStatus === DamageStatus.CLOSED) {
     updateData.dateResolved = new Date();
     updateData.reviewedBy = { connect: { id: userId } };
   }
@@ -341,6 +352,38 @@ export async function changeStatus(
   });
 
   return serializeDamageReport(report);
+}
+
+export async function bulkArchive(ids: string[]): Promise<{ archived: number; skipped: { id: string; reason: string }[] }> {
+  const reports = await prisma.damageReport.findMany({
+    where: { id: { in: ids } },
+    select: { id: true, status: true, isArchived: true },
+  });
+
+  const skipped: { id: string; reason: string }[] = [];
+  const toArchive: string[] = [];
+
+  for (const id of ids) {
+    const report = reports.find((r) => r.id === id);
+    if (!report) {
+      skipped.push({ id, reason: 'Report not found' });
+    } else if (report.status !== DamageStatus.CLOSED) {
+      skipped.push({ id, reason: 'Report is not closed' });
+    } else if (report.isArchived) {
+      skipped.push({ id, reason: 'Already archived' });
+    } else {
+      toArchive.push(id);
+    }
+  }
+
+  if (toArchive.length > 0) {
+    await prisma.damageReport.updateMany({
+      where: { id: { in: toArchive } },
+      data: { isArchived: true },
+    });
+  }
+
+  return { archived: toArchive.length, skipped };
 }
 
 export async function addComment(

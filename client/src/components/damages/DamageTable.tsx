@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Eye, MoreHorizontal, X, ChevronRight } from 'lucide-react';
+import { Archive, Eye, MoreHorizontal, X, ChevronRight } from 'lucide-react';
 import {
   Table, TableHeader, TableBody, TableRow, TableHead, TableCell
 } from '../ui/table';
@@ -23,21 +23,18 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../ui/alert-dialog';
-import { StatusBadge, SeverityBadge } from './StatusBadge';
+import { StatusBadge } from './StatusBadge';
 import { Skeleton } from '../ui/skeleton';
 import { DamageReport, DamageStatus } from '../../types';
 import { formatDate, CAUSE_LABELS, STATUS_LABELS } from '../../utils/formatters';
-import { useChangeStatus, useBulkStatusChange } from '../../hooks/useDamages';
+import { useChangeStatus, useBulkStatusChange, useBulkArchive } from '../../hooks/useDamages';
 import { useAuth } from '../../hooks/useAuth';
 
 const STATUS_TRANSITIONS: Record<DamageStatus, DamageStatus[]> = {
-  DRAFT: ['REPORTED'],
-  REPORTED: ['UNDER_REVIEW', 'CLOSED'],
-  UNDER_REVIEW: ['CUSTOMER_NOTIFIED', 'CLAIM_FILED', 'RESOLVED', 'CLOSED'],
-  CUSTOMER_NOTIFIED: ['CLAIM_FILED', 'RESOLVED', 'CLOSED'],
-  CLAIM_FILED: ['RESOLVED', 'WRITTEN_OFF', 'CLOSED'],
-  RESOLVED: ['CLOSED'],
-  WRITTEN_OFF: ['CLOSED'],
+  OPEN: ['CUSTOMER_NOTIFIED'],
+  CUSTOMER_NOTIFIED: ['DESTROY_STOCK', 'REP_COLLECT'],
+  DESTROY_STOCK: ['CLOSED'],
+  REP_COLLECT: ['CLOSED'],
   CLOSED: [],
 };
 
@@ -57,10 +54,12 @@ export function DamageTable({ damages, isLoading, pagination, onPageChange }: Da
   const { user } = useAuth();
   const changeStatus = useChangeStatus();
   const bulkStatusChange = useBulkStatusChange();
+  const bulkArchive = useBulkArchive();
   const isManagerOrAdmin = user?.role === 'ADMIN' || user?.role === 'MANAGER';
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [pendingBulkStatus, setPendingBulkStatus] = useState<DamageStatus | null>(null);
+  const [pendingArchive, setPendingArchive] = useState(false);
 
   const allSelected = damages.length > 0 && damages.every((d) => selectedIds.has(d.id));
   const someSelected = selectedIds.size > 0;
@@ -89,6 +88,20 @@ export function DamageTable({ damages, isLoading, pagination, onPageChange }: Da
     const intersection = [...sets[0]].filter((s) => sets.every((set) => set.has(s)));
     return intersection;
   })();
+
+  const allSelectedAreClosed = selectedDamages.length > 0 && selectedDamages.every((d) => d.status === 'CLOSED');
+
+  const handleArchiveConfirm = () => {
+    bulkArchive.mutate([...selectedIds], {
+      onSuccess: () => {
+        setSelectedIds(new Set());
+        setPendingArchive(false);
+      },
+      onError: () => {
+        setPendingArchive(false);
+      },
+    });
+  };
 
   const handleBulkStatusConfirm = () => {
     if (!pendingBulkStatus) return;
@@ -145,6 +158,12 @@ export function DamageTable({ damages, isLoading, pagination, onPageChange }: Da
             </DropdownMenuContent>
           </DropdownMenu>
         )}
+        {allSelectedAreClosed && (
+          <Button variant="outline" size="sm" onClick={() => setPendingArchive(true)}>
+            <Archive className="h-4 w-4 mr-1" />
+            Archive
+          </Button>
+        )}
         <Button variant="ghost" size="sm" className="ml-auto" onClick={() => setSelectedIds(new Set())}>
           <X className="h-4 w-4 mr-1" />
           Clear
@@ -189,7 +208,6 @@ export function DamageTable({ damages, isLoading, pagination, onPageChange }: Da
                 <p className="text-sm font-medium mt-1 truncate">{damage.customer?.name}</p>
                 <p className="text-xs text-muted-foreground truncate">{damage.product?.name}</p>
                 <div className="flex items-center gap-2 mt-2 flex-wrap">
-                  <SeverityBadge severity={damage.severity} />
                   <span className="text-xs text-muted-foreground">{formatDate(damage.dateOfDamage)}</span>
                   <span className="text-xs text-muted-foreground ml-auto">
                     {damage.reportedBy?.firstName} {damage.reportedBy?.lastName}
@@ -221,7 +239,6 @@ export function DamageTable({ damages, isLoading, pagination, onPageChange }: Da
               <TableHead>Date</TableHead>
               <TableHead>Customer</TableHead>
               <TableHead>Product</TableHead>
-              <TableHead>Severity</TableHead>
               {/* Cause: visible on xl+ only */}
               <TableHead className="hidden xl:table-cell">Cause</TableHead>
               <TableHead>Status</TableHead>
@@ -267,9 +284,6 @@ export function DamageTable({ damages, isLoading, pagination, onPageChange }: Da
                     <p className="text-sm">{damage.product?.name}</p>
                     <p className="text-xs text-muted-foreground">{damage.product?.sku}</p>
                   </div>
-                </TableCell>
-                <TableCell>
-                  <SeverityBadge severity={damage.severity} />
                 </TableCell>
                 <TableCell className="hidden xl:table-cell text-sm">
                   {CAUSE_LABELS[damage.cause]}
@@ -364,6 +378,26 @@ export function DamageTable({ damages, isLoading, pagination, onPageChange }: Da
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleBulkStatusConfirm}>Confirm</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk archive confirmation dialog */}
+      <AlertDialog
+        open={pendingArchive}
+        onOpenChange={(open) => { if (!open) setPendingArchive(false); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Archive Reports</AlertDialogTitle>
+            <AlertDialogDescription>
+              Archive {selectedIds.size} closed report(s)? Archived reports will be
+              hidden from the default list.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleArchiveConfirm}>Archive</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

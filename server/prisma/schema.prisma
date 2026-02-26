@@ -14,13 +14,10 @@ enum Role {
 }
 
 enum DamageStatus {
-  DRAFT
-  REPORTED
-  UNDER_REVIEW
+  OPEN
   CUSTOMER_NOTIFIED
-  CLAIM_FILED
-  RESOLVED
-  WRITTEN_OFF
+  DESTROY_STOCK
+  REP_COLLECT
   CLOSED
 }
 
@@ -101,6 +98,21 @@ model Product {
   @@unique([sku, customerId])
 }
 
+model WarehouseLocation {
+  id          String    @id @default(cuid())
+  code        String    @unique
+  zone        String?
+  aisle       String?
+  rack        String?
+  shelf       String?
+  description String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  damages     DamageReport[]
+}
+
 model DamageReport {
   id                String          @id @default(cuid())
   referenceNumber   String          @unique
@@ -111,13 +123,15 @@ model DamageReport {
   product           Product         @relation(fields: [productId], references: [id])
 
   quantity          Int
-  severity          DamageSeverity
+  severity          DamageSeverity?
   cause             DamageCause
   causeOther        String?
   description       String
-  locationInWarehouse String?
+  warehouseLocationId String?
+  warehouseLocation   WarehouseLocation? @relation(fields: [warehouseLocationId], references: [id])
 
-  status            DamageStatus     @default(DRAFT)
+  status            DamageStatus     @default(OPEN)
+  isArchived        Boolean          @default(false)
   estimatedLoss     Decimal?         @db.Decimal(10, 2)
 
   reportedById      String

@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getDamages, getDamage, createDamage, updateDamage, deleteDamage, changeStatus, bulkStatusChange } from '../api/damages';
+import { getDamages, getDamage, createDamage, updateDamage, deleteDamage, changeStatus, bulkStatusChange, bulkArchive } from '../api/damages';
 import { DamageFilters } from '../api/damages';
 import { toast } from 'sonner';
 
@@ -90,6 +90,24 @@ export function useBulkStatusChange() {
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.error || 'Bulk status change failed');
+    },
+  });
+}
+
+export function useBulkArchive() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: bulkArchive,
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['damages'] });
+      if (result.skipped.length > 0) {
+        toast.warning(`Archived ${result.archived}, skipped ${result.skipped.length} report(s)`);
+      } else {
+        toast.success(`${result.archived} report(s) archived`);
+      }
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.error || 'Bulk archive failed');
     },
   });
 }

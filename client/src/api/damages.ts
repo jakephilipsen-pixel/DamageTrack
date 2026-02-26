@@ -83,6 +83,11 @@ export async function bulkStatusChange(payload: {
   return data;
 }
 
+export async function bulkArchive(ids: string[]): Promise<{ archived: number; skipped: { id: string; reason: string }[] }> {
+  const { data } = await apiClient.patch('/damages/bulk-archive', { ids });
+  return data;
+}
+
 export async function sendEmailReport(damageId: string, payload: {
   to: string; subject: string; body: string; includePhotos: boolean;
 }): Promise<void> {

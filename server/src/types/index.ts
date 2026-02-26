@@ -34,6 +34,7 @@ export interface DamageFilters {
   dateFrom?: string;
   dateTo?: string;
   reportedById?: string;
+  isArchived?: boolean;
 }
 
 export interface PaginatedResult<T> {
