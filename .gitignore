@@ -51,3 +51,9 @@ stress-test/results/
 # SSL certificates — never commit private keys
 nginx/certs/*.crt
 nginx/certs/*.key
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+!.env.example
