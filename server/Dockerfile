@@ -22,4 +22,4 @@ RUN mkdir -p uploads/photos uploads/thumbnails uploads/branding
 
 EXPOSE 3001
 
-CMD ["sh", "-c", "npx prisma migrate deploy && npx prisma db seed && node dist/index.js"]
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/src/index.js"]
