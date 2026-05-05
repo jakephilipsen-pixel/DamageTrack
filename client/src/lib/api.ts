@@ -10,11 +10,13 @@ export class ApiError extends Error {
   }
 }
 
-async function handleResponse<T>(res: Response): Promise<T> {
+async function handleResponse<T>(res: Response, skipAuthRedirect = false): Promise<T> {
   if (!res.ok) {
-    // If 401, redirect to login
+    // If 401, redirect to login (unless this is an auth check)
     if (res.status === 401) {
-      window.location.href = "/login";
+      if (!skipAuthRedirect && window.location.pathname !== "/login") {
+        window.location.href = "/login";
+      }
       throw new ApiError("Unauthorized", 401);
     }
 
@@ -34,11 +36,11 @@ async function handleResponse<T>(res: Response): Promise<T> {
   return res.json();
 }
 
-export async function apiGet<T>(path: string): Promise<T> {
+export async function apiGet<T>(path: string, opts?: { skipAuthRedirect?: boolean }): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     credentials: "include",
   });
-  return handleResponse<T>(res);
+  return handleResponse<T>(res, opts?.skipAuthRedirect);
 }
 
 export async function apiPost<T>(path: string, body?: unknown): Promise<T> {

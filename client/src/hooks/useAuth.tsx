@@ -25,7 +25,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const checkAuth = useCallback(async () => {
     try {
-      const me = await apiGet<User>("/auth/me");
+      const me = await apiGet<User>("/auth/me", { skipAuthRedirect: true });
       setUser(me);
     } catch {
       setUser(null);
